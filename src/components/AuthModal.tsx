@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
-import ReCAPTCHA from 'react-google-recaptcha';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -20,34 +19,18 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     password: '',
     fullName: ''
   });
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const captchaRef = useRef<ReCAPTCHA>(null);
 
   const handleSubmit = async (mode: 'signin' | 'signup') => {
-    if (!captchaToken) {
-      return; // Don't submit without captcha
-    }
-    
     try {
       if (mode === 'signup') {
-        await signUp(formData.email, formData.password, formData.fullName, captchaToken);
+        await signUp(formData.email, formData.password, formData.fullName);
       } else {
-        await signIn(formData.email, formData.password, captchaToken);
+        await signIn(formData.email, formData.password);
       }
       onClose();
-      // Reset captcha after successful submission
-      captchaRef.current?.reset();
-      setCaptchaToken(null);
     } catch (error) {
       // Error is handled in the auth hook
-      // Reset captcha on error
-      captchaRef.current?.reset();
-      setCaptchaToken(null);
     }
-  };
-
-  const handleCaptchaChange = (token: string | null) => {
-    setCaptchaToken(token);
   };
 
   return (
@@ -96,17 +79,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               </div>
             </div>
 
-            <div className="flex justify-center">
-              <ReCAPTCHA
-                ref={captchaRef}
-                sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" // This is Google's test key - replace with your actual site key
-                onChange={handleCaptchaChange}
-              />
-            </div>
-
             <Button 
               onClick={() => handleSubmit('signin')}
-              disabled={loading || !formData.email || !formData.password || !captchaToken}
+              disabled={loading || !formData.email || !formData.password}
               className="w-full"
             >
               {loading ? (
@@ -162,17 +137,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               </div>
             </div>
 
-            <div className="flex justify-center">
-              <ReCAPTCHA
-                ref={captchaRef}
-                sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" // This is Google's test key - replace with your actual site key
-                onChange={handleCaptchaChange}
-              />
-            </div>
-
             <Button 
               onClick={() => handleSubmit('signup')}
-              disabled={loading || !formData.email || !formData.password || !formData.fullName || !captchaToken}
+              disabled={loading || !formData.email || !formData.password || !formData.fullName}
               className="w-full"
             >
               {loading ? (
