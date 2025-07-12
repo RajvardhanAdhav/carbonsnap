@@ -31,17 +31,21 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
   useEffect(() => {
     startCamera();
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      if (autoTimerRef.current) {
-        clearTimeout(autoTimerRef.current);
-      }
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
-      }
+      cleanup();
     };
   }, []);
+
+  const cleanup = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+    }
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+    }
+  };
 
   // Start real-time receipt detection when camera is active
   useEffect(() => {
@@ -174,6 +178,12 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
     
     // Reset auto-capture if it was enabled
     setAutoCapture(false);
+    
+    // Restart camera if needed
+    if (!stream || !stream.active) {
+      console.log('Restarting camera after retake...');
+      startCamera();
+    }
   };
 
   const confirmPhoto = () => {
