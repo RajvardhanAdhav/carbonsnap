@@ -209,6 +209,9 @@ const HomePage = () => {
                 Start Your Journey
               </Button>
             )}
+            <p className="text-xs text-white/70 mt-8">
+              Made by Rajvardhan Adhav
+            </p>
           </div>
         </div>
       </section>

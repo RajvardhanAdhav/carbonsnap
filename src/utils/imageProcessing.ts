@@ -33,9 +33,11 @@ export function convertToGrayscale(canvas: HTMLCanvasElement): HTMLCanvasElement
 
   for (let i = 0; i < data.length; i += 4) {
     const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-    data[i] = gray;     // Red
-    data[i + 1] = gray; // Green
-    data[i + 2] = gray; // Blue
+    // Tone down the grayscale by blending with original colors
+    const blendFactor = 0.7; // Reduce intensity
+    data[i] = gray * blendFactor + data[i] * (1 - blendFactor);     // Red
+    data[i + 1] = gray * blendFactor + data[i + 1] * (1 - blendFactor); // Green
+    data[i + 2] = gray * blendFactor + data[i + 2] * (1 - blendFactor); // Blue
   }
 
   ctx.putImageData(imageData, 0, 0);
