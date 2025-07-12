@@ -1,61 +1,54 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, TrendingDown, TrendingUp, Target, Calendar, Zap, Award, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const DashboardPage = () => {
+  const { user, session } = useAuth();
   const [timeframe, setTimeframe] = useState<"week" | "month" | "year">("month");
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const stats = {
-    week: {
-      total: 12.4,
-      change: -15,
-      goal: 15,
-      scans: 23
-    },
-    month: {
-      total: 52.8,
-      change: -8,
-      goal: 60,
-      scans: 89
-    },
-    year: {
-      total: 648.2,
-      change: -12,
-      goal: 700,
-      scans: 1024
+  useEffect(() => {
+    if (user && session?.access_token) {
+      fetchDashboardData();
+    }
+  }, [user, session, timeframe]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('get-dashboard-data', {
+        body: {},
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      setDashboardData(data.data);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const currentStats = stats[timeframe];
+  // Use real data if available, fallback to loading or empty state
+  const currentStats = dashboardData?.stats || { total: 0, change: 0, goal: 60, scans: 0 };
   const progressPercentage = Math.min((currentStats.total / currentStats.goal) * 100, 100);
-
-  const categoryData = [
-    { name: "Food & Beverages", emissions: 18.4, percentage: 35, color: "eco-primary" },
-    { name: "Transportation", emissions: 14.2, percentage: 27, color: "carbon-high" },
-    { name: "Clothing", emissions: 8.6, percentage: 16, color: "carbon-medium" },
-    { name: "Electronics", emissions: 6.8, percentage: 13, color: "accent" },
-    { name: "Other", emissions: 4.8, percentage: 9, color: "muted" }
-  ];
-
-  const weeklyData = [
-    { day: "Mon", emissions: 1.8 },
-    { day: "Tue", emissions: 2.4 },
-    { day: "Wed", emissions: 1.2 },
-    { day: "Thu", emissions: 3.1 },
-    { day: "Fri", emissions: 2.6 },
-    { day: "Sat", emissions: 0.9 },
-    { day: "Sun", emissions: 1.4 }
-  ];
-
-  const maxEmissions = Math.max(...weeklyData.map(d => d.emissions));
+  const categoryData = dashboardData?.categories || [];
+  const weeklyData = dashboardData?.weeklyData || [];
+  const maxEmissions = weeklyData.length > 0 ? Math.max(...weeklyData.map(d => d.emissions)) : 1;
 
   const achievements = [
-    { title: "Eco Warrior", description: "Reduced emissions by 20%", icon: Award, unlocked: true },
-    { title: "Scanner Pro", description: "100+ items scanned", icon: Zap, unlocked: true },
+    { title: "Eco Warrior", description: "Reduced emissions by 20%", icon: Award, unlocked: currentStats.change < 0 },
+    { title: "Scanner Pro", description: "100+ items scanned", icon: Zap, unlocked: currentStats.scans >= 100 },
     { title: "Green Week", description: "7 days under target", icon: Target, unlocked: false }
   ];
 
@@ -65,6 +58,17 @@ const DashboardPage = () => {
     "♻️ Buying second-hand clothing reduces fashion emissions by 80%",
     "💡 LED bulbs use 75% less energy than traditional bulbs"
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-eco-primary mx-auto mb-4"></div>
+          <p>Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

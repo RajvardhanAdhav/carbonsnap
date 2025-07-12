@@ -1,188 +1,164 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[SCAN-ITEM] ${step}${detailsStr}`);
-};
-
-// Mock barcode/image recognition - in production, integrate with OpenFoodFacts API or similar
-const mockProductDatabase = [
-  { barcode: "123456789012", name: "Organic Bananas", brand: "Chiquita", category: "fruits" },
-  { barcode: "123456789013", name: "Ground Beef", brand: "Local Farm", category: "beef" },
-  { barcode: "123456789014", name: "Oat Milk", brand: "Oatly", category: "dairy" },
-  { barcode: "123456789015", name: "iPhone Charger", brand: "Apple", category: "electronics" },
-  { barcode: "123456789016", name: "Chicken Breast", brand: "Organic Valley", category: "chicken" },
-  { barcode: "123456789017", name: "Spinach", brand: "Fresh Express", category: "vegetables" },
-  { barcode: "123456789018", name: "Shampoo", brand: "Pantene", category: "personal care" },
-  { barcode: "123456789019", name: "Coca Cola", brand: "Coca-Cola", category: "beverages" },
-  { barcode: "123456789020", name: "Bread", brand: "Wonder", category: "grains" },
-];
-
-const recognizeProduct = async (barcode?: string, imageUrl?: string) => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  if (barcode) {
-    const product = mockProductDatabase.find(p => p.barcode === barcode);
-    if (product) return product;
+// Carbon footprint database for different product categories
+const productCarbonData = {
+  clothing: {
+    cotton_shirt: { carbon: 5.4, details: { material: '100% Cotton', origin: 'India', transport: 'Sea freight' } },
+    jeans: { carbon: 33.4, details: { material: 'Cotton/Polyester blend', origin: 'Bangladesh', transport: 'Sea freight' } },
+    wool_sweater: { carbon: 47.2, details: { material: '100% Wool', origin: 'China', transport: 'Air freight' } },
+    synthetic_jacket: { carbon: 26.5, details: { material: 'Polyester', origin: 'Vietnam', transport: 'Sea freight' } }
+  },
+  electronics: {
+    smartphone: { carbon: 70.0, details: { material: 'Aluminum/Glass/Silicon', origin: 'China', transport: 'Air freight' } },
+    laptop: { carbon: 300.0, details: { material: 'Aluminum/Plastic/Silicon', origin: 'Taiwan', transport: 'Air freight' } },
+    headphones: { carbon: 8.5, details: { material: 'Plastic/Metal', origin: 'China', transport: 'Sea freight' } }
+  },
+  food: {
+    apple: { carbon: 0.4, details: { material: 'Organic', origin: 'Local farm', transport: 'Truck' } },
+    banana: { carbon: 0.6, details: { material: 'Conventional', origin: 'Ecuador', transport: 'Ship/Truck' } },
+    bread: { carbon: 1.2, details: { material: 'Wheat flour', origin: 'Local bakery', transport: 'Local delivery' } }
   }
-  
-  // If no barcode match, simulate image recognition with random product
-  const randomProduct = mockProductDatabase[Math.floor(Math.random() * mockProductDatabase.length)];
-  return randomProduct;
 };
 
-const matchToCategory = async (categoryName: string, supabase: any) => {
-  const { data: categories } = await supabase
-    .from('carbon_categories')
-    .select('*');
-  
-  // Direct match first
-  let category = categories?.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
-  
-  if (!category) {
-    // Fuzzy matching
-    const categoryMap = {
-      'fruits': 'Fruits',
-      'beef': 'Beef',
-      'dairy': 'Dairy',
-      'electronics': 'Electronics',
-      'chicken': 'Chicken',
-      'vegetables': 'Vegetables',
-      'personal care': 'Personal Care',
-      'beverages': 'Beverages',
-      'grains': 'Grains'
-    };
-    
-    const mappedCategory = categoryMap[categoryName.toLowerCase()];
-    if (mappedCategory) {
-      category = categories?.find(c => c.name === mappedCategory);
+function estimateProductCarbon(productName: string, category: string): {
+  carbon: number;
+  carbonCategory: 'low' | 'medium' | 'high';
+  details: any;
+} {
+  const name = productName.toLowerCase();
+  let carbon = 2.0; // default
+  let details = { material: 'Unknown', origin: 'Unknown', transport: 'Unknown', packaging: 'Standard' };
+
+  // Try to match product with our database
+  if (category === 'clothing' || name.includes('shirt') || name.includes('clothing')) {
+    if (name.includes('organic') || name.includes('cotton')) {
+      carbon = productCarbonData.clothing.cotton_shirt.carbon;
+      details = { ...productCarbonData.clothing.cotton_shirt.details, packaging: 'Recycled cardboard' };
+    } else if (name.includes('jeans') || name.includes('pants')) {
+      carbon = productCarbonData.clothing.jeans.carbon;
+      details = productCarbonData.clothing.jeans.details;
+    } else if (name.includes('wool') || name.includes('sweater')) {
+      carbon = productCarbonData.clothing.wool_sweater.carbon;
+      details = productCarbonData.clothing.wool_sweater.details;
+    } else {
+      carbon = productCarbonData.clothing.synthetic_jacket.carbon;
+      details = productCarbonData.clothing.synthetic_jacket.details;
     }
+  } else if (category === 'electronics' || name.includes('phone') || name.includes('computer')) {
+    if (name.includes('phone') || name.includes('mobile')) {
+      carbon = productCarbonData.electronics.smartphone.carbon;
+      details = productCarbonData.electronics.smartphone.details;
+    } else if (name.includes('laptop') || name.includes('computer')) {
+      carbon = productCarbonData.electronics.laptop.carbon;
+      details = productCarbonData.electronics.laptop.details;
+    } else {
+      carbon = productCarbonData.electronics.headphones.carbon;
+      details = productCarbonData.electronics.headphones.details;
+    }
+  } else if (name.includes('apple') || name.includes('fruit')) {
+    carbon = productCarbonData.food.apple.carbon;
+    details = productCarbonData.food.apple.details;
   }
-  
-  // Default fallback
-  return category || categories?.find(c => c.name === 'Packaged Foods');
-};
 
-const calculateCarbonFootprint = (category: any) => {
-  if (!category) return 0;
+  const carbonCategory = carbon < 5 ? 'low' : carbon < 25 ? 'medium' : 'high';
   
-  // For items, we typically calculate per unit
-  return category.base_emission_factor;
-};
+  return { carbon, carbonCategory, details };
+}
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    logStep("Function started");
-    
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) throw new Error("Authentication failed");
-
-    const { barcode, imageUrl } = await req.json();
-    if (!barcode && !imageUrl) throw new Error("Barcode or image URL required");
-
-    logStep("Scanning item", { barcode, imageUrl: !!imageUrl });
-
-    // Recognize product using barcode or image
-    const product = await recognizeProduct(barcode, imageUrl);
-    if (!product) {
-      throw new Error("Product not recognized");
+    const { 
+      productName, 
+      brand = 'Unknown', 
+      barcode, 
+      imageData, 
+      scanMethod = 'camera',
+      category = 'general' 
+    } = await req.json();
+    
+    if (!productName) {
+      throw new Error('Product name is required');
     }
 
-    logStep("Product recognized", { product });
+    // Get user from auth header
+    const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
+    
+    if (authError || !user) {
+      throw new Error('Authentication required');
+    }
 
-    // Match to carbon category
-    const category = await matchToCategory(product.category, supabase);
-    const carbonFootprint = calculateCarbonFootprint(category);
+    console.log('Processing single item for user:', user.id, 'Product:', productName);
 
-    // Save scanned item
+    // Estimate carbon footprint
+    const { carbon, carbonCategory, details } = estimateProductCarbon(productName, category);
+
+    // Store the scanned item
     const { data: scannedItem, error: insertError } = await supabase
       .from('scanned_items')
       .insert({
-        user_id: userData.user.id,
-        item_name: product.name,
-        barcode: product.barcode,
-        brand: product.brand,
-        category_id: category?.id,
-        carbon_footprint: carbonFootprint,
-        image_url: imageUrl
+        user_id: user.id,
+        item_type: 'single_item',
+        product_name: productName,
+        brand: brand,
+        barcode: barcode,
+        carbon_footprint: carbon,
+        carbon_category: carbonCategory,
+        scan_method: scanMethod,
+        details: details
       })
       .select()
       .single();
 
-    if (insertError) throw insertError;
-
-    logStep("Item saved", { itemId: scannedItem.id, carbonFootprint });
-
-    // Check for achievements
-    const { data: totalItems } = await supabase
-      .from('scanned_items')
-      .select('id', { count: 'exact' })
-      .eq('user_id', userData.user.id);
-
-    const achievements = [];
-    if (totalItems && totalItems.length === 1) {
-      // First scan achievement
-      const { error: achievementError } = await supabase
-        .from('user_achievements')
-        .upsert({
-          user_id: userData.user.id,
-          achievement_type: 'first_scan',
-          title: 'First Scan',
-          description: 'Scanned your first item!',
-          icon: '🔍'
-        });
-      
-      if (!achievementError) {
-        achievements.push({
-          title: 'First Scan',
-          description: 'Scanned your first item!',
-          icon: '🔍'
-        });
-      }
+    if (insertError) {
+      console.error('Error inserting scanned item:', insertError);
+      throw insertError;
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      product: {
-        name: product.name,
-        brand: product.brand,
-        category: category?.name,
-        carbonFootprint,
-        barcode: product.barcode
-      },
-      achievements
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    console.log('Item scanned successfully');
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          id: scannedItem.id,
+          name: productName,
+          brand: brand,
+          carbon: carbon,
+          category: carbonCategory,
+          details: details
+        }
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
 
   } catch (error) {
-    logStep("ERROR", { message: error.message });
-    return new Response(JSON.stringify({ 
-      error: error.message 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error('Error processing item:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 });

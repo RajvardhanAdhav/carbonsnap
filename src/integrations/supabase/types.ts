@@ -14,7 +14,137 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      receipt_items: {
+        Row: {
+          carbon_category: string | null
+          carbon_footprint: number
+          category: string | null
+          created_at: string
+          id: string
+          product_name: string
+          quantity: string | null
+          scanned_item_id: string | null
+          unit_price: number | null
+        }
+        Insert: {
+          carbon_category?: string | null
+          carbon_footprint: number
+          category?: string | null
+          created_at?: string
+          id?: string
+          product_name: string
+          quantity?: string | null
+          scanned_item_id?: string | null
+          unit_price?: number | null
+        }
+        Update: {
+          carbon_category?: string | null
+          carbon_footprint?: number
+          category?: string | null
+          created_at?: string
+          id?: string
+          product_name?: string
+          quantity?: string | null
+          scanned_item_id?: string | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_items_scanned_item_id_fkey"
+            columns: ["scanned_item_id"]
+            isOneToOne: false
+            referencedRelation: "scanned_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scanned_items: {
+        Row: {
+          barcode: string | null
+          brand: string | null
+          carbon_category: string | null
+          carbon_footprint: number
+          created_at: string
+          details: Json | null
+          id: string
+          image_url: string | null
+          item_type: string
+          product_name: string | null
+          receipt_date: string | null
+          receipt_total: number | null
+          scan_method: string | null
+          store_name: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          brand?: string | null
+          carbon_category?: string | null
+          carbon_footprint: number
+          created_at?: string
+          details?: Json | null
+          id?: string
+          image_url?: string | null
+          item_type: string
+          product_name?: string | null
+          receipt_date?: string | null
+          receipt_total?: number | null
+          scan_method?: string | null
+          store_name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          brand?: string | null
+          carbon_category?: string | null
+          carbon_footprint?: number
+          created_at?: string
+          details?: Json | null
+          id?: string
+          image_url?: string | null
+          item_type?: string
+          product_name?: string | null
+          receipt_date?: string | null
+          receipt_total?: number | null
+          scan_method?: string | null
+          store_name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_goals: {
+        Row: {
+          created_at: string
+          id: string
+          monthly_goal: number | null
+          updated_at: string
+          user_id: string | null
+          weekly_goal: number | null
+          yearly_goal: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          monthly_goal?: number | null
+          updated_at?: string
+          user_id?: string | null
+          weekly_goal?: number | null
+          yearly_goal?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          monthly_goal?: number | null
+          updated_at?: string
+          user_id?: string | null
+          weekly_goal?: number | null
+          yearly_goal?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

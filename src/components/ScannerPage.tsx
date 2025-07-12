@@ -1,54 +1,117 @@
 import { useState } from "react";
-import { Camera, Upload, Scan, Receipt, Package, ArrowLeft, CheckCircle } from "lucide-react";
+import { Camera, Upload, Scan, Receipt, Package, ArrowLeft, CheckCircle, Edit, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import CameraScanner from "./CameraScanner";
+import ManualInputModal from "./ManualInputModal";
 
 type ScanMode = "receipt" | "item";
 
 const ScannerPage = () => {
+  const { user, session } = useAuth();
   const [scanMode, setScanMode] = useState<ScanMode>("receipt");
   const [isScanning, setIsScanning] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
 
-  const mockScanReceipt = () => {
+  const processImage = async (imageData: string, scanMethod: string = 'camera') => {
+    if (!user || !session?.access_token) {
+      throw new Error('User not authenticated');
+    }
+
     setIsScanning(true);
-    setTimeout(() => {
-      setScanResult({
-        type: "receipt",
-        store: "Green Market",
-        date: "2024-01-12",
-        items: [
-          { name: "Organic Apples", quantity: "2 lbs", carbon: 0.8, category: "low" },
-          { name: "Beef Steak", quantity: "1 lb", carbon: 27.2, category: "high" },
-          { name: "Plant Milk", quantity: "1 bottle", carbon: 0.9, category: "low" },
-          { name: "Bread", quantity: "1 loaf", carbon: 1.2, category: "low" }
-        ],
-        totalCarbon: 30.1
-      });
+    
+    try {
+      if (scanMode === 'receipt') {
+        const { data, error } = await supabase.functions.invoke('process-receipt', {
+          body: { imageData, scanMethod },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (error) throw error;
+        setScanResult({ type: 'receipt', ...data.data });
+      } else {
+        // For single items, we'll use a simplified approach
+        // In a real app, you'd use OCR/vision APIs to extract product info
+        const { data, error } = await supabase.functions.invoke('scan-item', {
+          body: { 
+            productName: 'Scanned Product', // This would come from OCR
+            brand: 'Unknown',
+            imageData,
+            scanMethod,
+            category: 'general'
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (error) throw error;
+        setScanResult({ type: 'item', ...data.data });
+      }
+    } catch (error) {
+      console.error('Error processing image:', error);
+      alert('Failed to process image. Please try again.');
+    } finally {
       setIsScanning(false);
-    }, 2000);
+      setShowCamera(false);
+    }
   };
 
-  const mockScanItem = () => {
+  const handleManualSubmit = async (data: any) => {
+    if (!user || !session?.access_token) {
+      throw new Error('User not authenticated');
+    }
+
     setIsScanning(true);
-    setTimeout(() => {
-      setScanResult({
-        type: "item",
-        name: "Organic Cotton T-Shirt",
-        brand: "EcoWear",
-        carbon: 5.4,
-        category: "medium",
-        details: {
-          material: "100% Organic Cotton",
-          origin: "Turkey",
-          transport: "Sea freight",
-          packaging: "Recycled cardboard"
-        }
-      });
+    
+    try {
+      if (data.type === 'receipt') {
+        // Process manual receipt data
+        const { data: result, error } = await supabase.functions.invoke('process-receipt', {
+          body: { 
+            imageData: 'manual-input', // Placeholder for manual input
+            scanMethod: 'manual',
+            manualData: data
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (error) throw error;
+        setScanResult({ type: 'receipt', ...result.data });
+      } else {
+        // Process single item
+        const { data: result, error } = await supabase.functions.invoke('scan-item', {
+          body: { 
+            productName: data.productName,
+            brand: data.brand,
+            category: data.category,
+            scanMethod: 'manual'
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (error) throw error;
+        setScanResult({ type: 'item', ...result.data });
+      }
+    } catch (error) {
+      console.error('Error processing manual input:', error);
+      alert('Failed to process input. Please try again.');
+    } finally {
       setIsScanning(false);
-    }, 2000);
+      setShowManualInput(false);
+    }
   };
 
   const getCarbonColor = (category: string) => {
@@ -84,7 +147,13 @@ const ScannerPage = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6 max-w-2xl">
-        {!scanResult ? (
+        {showCamera ? (
+          <CameraScanner
+            onCapture={(imageData) => processImage(imageData, 'camera')}
+            onCancel={() => setShowCamera(false)}
+            isProcessing={isScanning}
+          />
+        ) : !scanResult ? (
           <>
             {/* Scan Mode Selection */}
             <div className="mb-8">
@@ -118,7 +187,7 @@ const ScannerPage = () => {
               </div>
             </div>
 
-            {/* Camera Interface */}
+            {/* Scanner Options */}
             <Card className="p-8 text-center border-dashed border-2 border-eco-primary/30 bg-eco-light/30">
               <div className="space-y-6">
                 <div className="relative mx-auto w-32 h-32 bg-eco-primary/10 rounded-full flex items-center justify-center">
@@ -130,39 +199,44 @@ const ScannerPage = () => {
                 
                 <div>
                   <h3 className="text-xl font-semibold mb-2">
-                    {isScanning ? "Analyzing..." : `Ready to scan ${scanMode}`}
+                    {isScanning ? "Processing..." : `Ready to scan ${scanMode}`}
                   </h3>
                   <p className="text-muted-foreground">
                     {isScanning 
-                      ? "Processing image and calculating carbon footprint..."
-                      : `Position your ${scanMode} in the camera view and tap to scan`
+                      ? "Processing and calculating carbon footprint..."
+                      : `Use your camera to scan a ${scanMode} or enter data manually`
                     }
                   </p>
                 </div>
 
                 <div className="space-y-3">
                   <Button 
-                    onClick={scanMode === "receipt" ? mockScanReceipt : mockScanItem}
+                    onClick={() => setShowCamera(true)}
                     disabled={isScanning}
                     size="lg" 
                     className="w-full bg-gradient-eco hover:opacity-90"
                   >
                     {isScanning ? (
                       <>
-                        <Scan className="mr-2 h-5 w-5 animate-spin" />
-                        Scanning...
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Processing...
                       </>
                     ) : (
                       <>
                         <Camera className="mr-2 h-5 w-5" />
-                        Capture {scanMode === "receipt" ? "Receipt" : "Item"}
+                        Open Camera
                       </>
                     )}
                   </Button>
                   
-                  <Button variant="outline" className="w-full">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload from Gallery
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setShowManualInput(true)}
+                    disabled={isScanning}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Manual Input
                   </Button>
                 </div>
               </div>
@@ -268,6 +342,14 @@ const ScannerPage = () => {
             </div>
           </div>
         )}
+
+        {/* Manual Input Modal */}
+        <ManualInputModal
+          isOpen={showManualInput}
+          onClose={() => setShowManualInput(false)}
+          onSubmit={handleManualSubmit}
+          isLoading={isScanning}
+        />
       </div>
     </div>
   );

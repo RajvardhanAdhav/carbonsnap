@@ -1,226 +1,181 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[PROCESS-RECEIPT] ${step}${detailsStr}`);
-};
+interface ReceiptItem {
+  name: string;
+  quantity: string;
+  carbon: number;
+  category: 'low' | 'medium' | 'high';
+  price?: number;
+}
 
-// Simple OCR simulation - in production, integrate with Google Vision API or similar
-const simulateOCR = (imageUrl: string): string => {
-  // Mock OCR results for demo purposes
-  const mockReceipts = [
-    `WHOLE FOODS MARKET
-123 Main St, City
-Date: ${new Date().toLocaleDateString()}
--------------------
-Organic Bananas     $3.99
-Ground Beef 1lb     $8.99
-Oat Milk           $4.49
-Spinach Leaves     $2.99
-Chicken Breast     $12.99
--------------------
-Total:            $33.45`,
-    
-    `TARGET STORE
-456 Oak Ave, Town
-Date: ${new Date().toLocaleDateString()}
--------------------
-iPhone Charger     $19.99
-Toothpaste         $3.49
-Shampoo           $7.99
-Apples 2lbs       $4.98
-Bread             $2.99
--------------------
-Total:            $39.44`
+interface ProcessedReceipt {
+  store: string;
+  date: string;
+  items: ReceiptItem[];
+  totalCarbon: number;
+  total?: number;
+}
+
+// Simple carbon footprint estimation based on product categories
+function estimateCarbonFootprint(productName: string): { carbon: number; category: 'low' | 'medium' | 'high' } {
+  const name = productName.toLowerCase();
+  
+  // High carbon foods
+  if (name.includes('beef') || name.includes('steak') || name.includes('lamb')) {
+    return { carbon: 27.0, category: 'high' };
+  }
+  if (name.includes('pork') || name.includes('ham') || name.includes('bacon')) {
+    return { carbon: 12.0, category: 'high' };
+  }
+  if (name.includes('chicken') || name.includes('turkey')) {
+    return { carbon: 6.0, category: 'medium' };
+  }
+  if (name.includes('cheese') || name.includes('dairy')) {
+    return { carbon: 9.0, category: 'medium' };
+  }
+  
+  // Low carbon foods
+  if (name.includes('apple') || name.includes('banana') || name.includes('fruit')) {
+    return { carbon: 0.4, category: 'low' };
+  }
+  if (name.includes('vegetables') || name.includes('lettuce') || name.includes('carrot')) {
+    return { carbon: 0.3, category: 'low' };
+  }
+  if (name.includes('plant') || name.includes('oat') || name.includes('soy')) {
+    return { carbon: 0.9, category: 'low' };
+  }
+  if (name.includes('bread') || name.includes('pasta') || name.includes('rice')) {
+    return { carbon: 1.2, category: 'low' };
+  }
+  
+  // Default medium carbon
+  return { carbon: 2.5, category: 'medium' };
+}
+
+// Mock OCR processing - in real implementation, you'd use a service like Google Vision API
+function processReceiptImage(imageData: string): ProcessedReceipt {
+  // For now, return mock data with realistic carbon footprints
+  const mockItems: ReceiptItem[] = [
+    { name: "Organic Apples", quantity: "2 lbs", ...estimateCarbonFootprint("apples"), price: 4.99 },
+    { name: "Ground Beef", quantity: "1 lb", ...estimateCarbonFootprint("beef"), price: 8.99 },
+    { name: "Plant Milk", quantity: "1 bottle", ...estimateCarbonFootprint("plant milk"), price: 3.49 },
+    { name: "Whole Wheat Bread", quantity: "1 loaf", ...estimateCarbonFootprint("bread"), price: 2.99 }
   ];
   
-  return mockReceipts[Math.floor(Math.random() * mockReceipts.length)];
-};
-
-// Extract items from OCR text using pattern matching
-const extractItemsFromOCR = (ocrText: string) => {
-  const lines = ocrText.split('\n');
-  const items = [];
+  const totalCarbon = mockItems.reduce((sum, item) => sum + item.carbon, 0);
   
-  for (const line of lines) {
-    // Look for lines with items and prices (contains $ and product name)
-    const priceMatch = line.match(/\$(\d+\.?\d*)/);
-    if (priceMatch && !line.toLowerCase().includes('total') && !line.toLowerCase().includes('tax')) {
-      const price = parseFloat(priceMatch[1]);
-      const itemName = line.replace(/\$\d+\.?\d*/, '').trim();
-      
-      // Extract quantity if present
-      const quantityMatch = itemName.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg|oz|g)?/i);
-      const quantity = quantityMatch ? parseFloat(quantityMatch[1]) : 1;
-      const cleanName = itemName.replace(/\d+(?:\.\d+)?\s*(lb|lbs|kg|oz|g)?/i, '').trim();
-      
-      if (cleanName && price > 0) {
-        items.push({
-          name: cleanName,
-          price,
-          quantity
-        });
-      }
-    }
-  }
-  
-  return items;
-};
-
-// Match items to carbon categories using keywords
-const matchToCategory = async (itemName: string, supabase: any) => {
-  const { data: categories } = await supabase
-    .from('carbon_categories')
-    .select('*');
-  
-  const name = itemName.toLowerCase();
-  
-  // Keyword matching for categories
-  const categoryMap = {
-    'beef': ['beef', 'steak', 'ground beef', 'burger'],
-    'chicken': ['chicken', 'poultry', 'turkey'],
-    'pork': ['pork', 'bacon', 'ham', 'sausage'],
-    'fish': ['fish', 'salmon', 'tuna', 'seafood', 'shrimp'],
-    'dairy': ['milk', 'cheese', 'yogurt', 'butter', 'cream'],
-    'vegetables': ['spinach', 'broccoli', 'carrots', 'lettuce', 'tomato', 'cucumber'],
-    'fruits': ['banana', 'apple', 'orange', 'strawberry', 'grapes'],
-    'grains': ['bread', 'pasta', 'rice', 'cereal', 'oats'],
-    'electronics': ['phone', 'charger', 'cable', 'earphone', 'battery'],
-    'personal care': ['toothpaste', 'shampoo', 'soap', 'deodorant'],
-    'beverages': ['soda', 'juice', 'water', 'coffee', 'tea']
+  return {
+    store: "Green Market",
+    date: new Date().toISOString().split('T')[0],
+    items: mockItems,
+    totalCarbon: Number(totalCarbon.toFixed(2)),
+    total: mockItems.reduce((sum, item) => sum + (item.price || 0), 0)
   };
-  
-  for (const [categoryName, keywords] of Object.entries(categoryMap)) {
-    if (keywords.some(keyword => name.includes(keyword))) {
-      const category = categories?.find(c => c.name.toLowerCase() === categoryName);
-      if (category) {
-        return category;
-      }
-    }
-  }
-  
-  // Default to packaged foods if no match
-  return categories?.find(c => c.name.toLowerCase() === 'packaged foods') || null;
-};
+}
 
-// Calculate carbon footprint for an item
-const calculateCarbonFootprint = (quantity: number, category: any) => {
-  if (!category) return 0;
-  
-  // Convert quantity based on unit type
-  let effectiveQuantity = quantity;
-  if (category.unit === 'kg' && quantity < 10) {
-    // Assume small quantities are in kg already, larger ones might be in grams
-    effectiveQuantity = quantity;
-  } else if (category.unit === 'item') {
-    effectiveQuantity = Math.max(1, Math.round(quantity));
-  }
-  
-  return effectiveQuantity * category.base_emission_factor;
-};
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    logStep("Function started");
-    
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) throw new Error("Authentication failed");
-
-    const { receiptId, imageUrl } = await req.json();
-    if (!receiptId) throw new Error("Receipt ID required");
-
-    logStep("Processing receipt", { receiptId, imageUrl });
-
-    // Simulate OCR processing
-    const ocrText = simulateOCR(imageUrl);
-    logStep("OCR completed", { textLength: ocrText.length });
-
-    // Extract store name and date from OCR
-    const lines = ocrText.split('\n');
-    const storeName = lines[0]?.trim() || 'Unknown Store';
-    const dateMatch = ocrText.match(/Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
-    const receiptDate = dateMatch ? new Date(dateMatch[1]) : new Date();
-
-    // Update receipt with OCR data
-    await supabase
-      .from('receipts')
-      .update({
-        ocr_text: ocrText,
-        store_name: storeName,
-        receipt_date: receiptDate.toISOString().split('T')[0],
-        processed: true
-      })
-      .eq('id', receiptId);
-
-    // Extract and process items
-    const extractedItems = extractItemsFromOCR(ocrText);
-    logStep("Items extracted", { count: extractedItems.length });
-
-    const processedItems = [];
-    for (const item of extractedItems) {
-      const category = await matchToCategory(item.name, supabase);
-      const carbonFootprint = calculateCarbonFootprint(item.quantity, category);
-      
-      const { data: insertedItem } = await supabase
-        .from('receipt_items')
-        .insert({
-          receipt_id: receiptId,
-          item_name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          category_id: category?.id,
-          carbon_footprint: carbonFootprint
-        })
-        .select()
-        .single();
-
-      processedItems.push({
-        ...insertedItem,
-        category: category?.name
-      });
+    const { imageData, scanMethod = 'camera' } = await req.json();
+    
+    if (!imageData) {
+      throw new Error('Image data is required');
     }
 
-    logStep("Processing completed", { 
-      itemsProcessed: processedItems.length,
-      totalCarbon: processedItems.reduce((sum, item) => sum + item.carbon_footprint, 0)
-    });
+    // Get user from auth header
+    const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
+    
+    if (authError || !user) {
+      throw new Error('Authentication required');
+    }
 
-    return new Response(JSON.stringify({
-      success: true,
-      ocrText,
-      itemsProcessed: processedItems.length,
-      items: processedItems
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    console.log('Processing receipt for user:', user.id);
+
+    // Process the receipt image
+    const processedReceipt = processReceiptImage(imageData);
+
+    // Store the main receipt record
+    const { data: scannedItem, error: insertError } = await supabase
+      .from('scanned_items')
+      .insert({
+        user_id: user.id,
+        item_type: 'receipt',
+        store_name: processedReceipt.store,
+        receipt_date: processedReceipt.date,
+        receipt_total: processedReceipt.total,
+        carbon_footprint: processedReceipt.totalCarbon,
+        carbon_category: processedReceipt.totalCarbon > 20 ? 'high' : processedReceipt.totalCarbon > 10 ? 'medium' : 'low',
+        scan_method: scanMethod,
+        details: { itemCount: processedReceipt.items.length }
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting scanned item:', insertError);
+      throw insertError;
+    }
+
+    // Store individual receipt items
+    const receiptItems = processedReceipt.items.map(item => ({
+      scanned_item_id: scannedItem.id,
+      product_name: item.name,
+      quantity: item.quantity,
+      unit_price: item.price,
+      carbon_footprint: item.carbon,
+      carbon_category: item.category,
+      category: 'food' // Default category
+    }));
+
+    const { error: itemsError } = await supabase
+      .from('receipt_items')
+      .insert(receiptItems);
+
+    if (itemsError) {
+      console.error('Error inserting receipt items:', itemsError);
+      throw itemsError;
+    }
+
+    console.log('Receipt processed successfully');
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          id: scannedItem.id,
+          ...processedReceipt
+        }
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
 
   } catch (error) {
-    logStep("ERROR", { message: error.message });
-    return new Response(JSON.stringify({ 
-      error: error.message 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error('Error processing receipt:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 });

@@ -1,142 +1,146 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[DASHBOARD-DATA] ${step}${detailsStr}`);
-};
+function getDateRange(timeframe: 'week' | 'month' | 'year') {
+  const now = new Date();
+  const startDate = new Date();
+  
+  switch (timeframe) {
+    case 'week':
+      startDate.setDate(now.getDate() - 7);
+      break;
+    case 'month':
+      startDate.setMonth(now.getMonth() - 1);
+      break;
+    case 'year':
+      startDate.setFullYear(now.getFullYear() - 1);
+      break;
+  }
+  
+  return { startDate: startDate.toISOString(), endDate: now.toISOString() };
+}
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    logStep("Function started");
-    
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
+    const url = new URL(req.url);
+    const timeframe = url.searchParams.get('timeframe') as 'week' | 'month' | 'year' || 'month';
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) throw new Error("Authentication failed");
+    // Get user from auth header
+    const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
+    
+    if (authError || !user) {
+      throw new Error('Authentication required');
+    }
 
-    const userId = userData.user.id;
-    logStep("User authenticated", { userId });
+    console.log('Getting dashboard data for user:', user.id, 'timeframe:', timeframe);
 
-    // Get user profile with carbon goal
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('carbon_goal, full_name')
-      .eq('id', userId)
+    const { startDate, endDate } = getDateRange(timeframe);
+
+    // Get user's scanned items for the timeframe
+    const { data: scannedItems, error: itemsError } = await supabase
+      .from('scanned_items')
+      .select(`
+        *,
+        receipt_items (*)
+      `)
+      .eq('user_id', user.id)
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .order('created_at', { ascending: false });
+
+    if (itemsError) {
+      throw itemsError;
+    }
+
+    // Get user goals
+    const { data: userGoals } = await supabase
+      .from('user_goals')
+      .select('*')
+      .eq('user_id', user.id)
       .single();
 
-    // Calculate date ranges
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    // Get weekly carbon data from receipts and scanned items
-    const { data: weeklyReceipts } = await supabase
-      .from('receipts')
-      .select('total_carbon_footprint, created_at')
-      .eq('user_id', userId)
-      .gte('created_at', startOfWeek.toISOString())
-      .eq('processed', true);
-
-    const { data: weeklyScans } = await supabase
-      .from('scanned_items')
-      .select('carbon_footprint, scan_date')
-      .eq('user_id', userId)
-      .gte('scan_date', startOfWeek.toISOString());
-
-    // Get monthly data
-    const { data: monthlyReceipts } = await supabase
-      .from('receipts')
-      .select('total_carbon_footprint, created_at')
-      .eq('user_id', userId)
-      .gte('created_at', startOfMonth.toISOString())
-      .lte('created_at', endOfMonth.toISOString())
-      .eq('processed', true);
-
-    const { data: monthlyScans } = await supabase
-      .from('scanned_items')
-      .select('carbon_footprint, scan_date')
-      .eq('user_id', userId)
-      .gte('scan_date', startOfMonth.toISOString())
-      .lte('scan_date', endOfMonth.toISOString());
-
-    // Calculate totals
-    const weeklyReceiptCarbon = weeklyReceipts?.reduce((sum, r) => sum + (r.total_carbon_footprint || 0), 0) || 0;
-    const weeklyScanCarbon = weeklyScans?.reduce((sum, s) => sum + (s.carbon_footprint || 0), 0) || 0;
-    const weeklyTotal = weeklyReceiptCarbon + weeklyScanCarbon;
-
-    const monthlyReceiptCarbon = monthlyReceipts?.reduce((sum, r) => sum + (r.total_carbon_footprint || 0), 0) || 0;
-    const monthlyScanCarbon = monthlyScans?.reduce((sum, s) => sum + (s.carbon_footprint || 0), 0) || 0;
-    const monthlyTotal = monthlyReceiptCarbon + monthlyScanCarbon;
-
-    // Get category breakdown
-    const { data: receiptItems } = await supabase
-      .from('receipt_items')
-      .select(`
-        carbon_footprint,
-        carbon_categories!inner(name)
-      `)
-      .gte('created_at', startOfMonth.toISOString())
-      .lte('created_at', endOfMonth.toISOString())
-      .not('carbon_footprint', 'is', null);
-
-    const { data: scannedItemsWithCategories } = await supabase
-      .from('scanned_items')
-      .select(`
-        carbon_footprint,
-        carbon_categories!inner(name)
-      `)
-      .eq('user_id', userId)
-      .gte('scan_date', startOfMonth.toISOString())
-      .lte('scan_date', endOfMonth.toISOString());
-
-    // Combine and group by category
-    const categoryData = {};
+    // Calculate statistics
+    const totalEmissions = scannedItems.reduce((sum, item) => sum + Number(item.carbon_footprint), 0);
+    const totalScans = scannedItems.length;
     
-    receiptItems?.forEach(item => {
-      const category = item.carbon_categories.name;
-      categoryData[category] = (categoryData[category] || 0) + item.carbon_footprint;
+    // Get goal for timeframe
+    const goals = userGoals || { weekly_goal: 15, monthly_goal: 60, yearly_goal: 700 };
+    const goal = timeframe === 'week' ? goals.weekly_goal : 
+                timeframe === 'month' ? goals.monthly_goal : goals.yearly_goal;
+
+    // Calculate previous period for comparison
+    const prevStartDate = new Date(startDate);
+    const prevEndDate = new Date(startDate);
+    
+    if (timeframe === 'week') {
+      prevStartDate.setDate(prevStartDate.getDate() - 7);
+    } else if (timeframe === 'month') {
+      prevStartDate.setMonth(prevStartDate.getMonth() - 1);
+    } else {
+      prevStartDate.setFullYear(prevStartDate.getFullYear() - 1);
+    }
+
+    const { data: prevItems } = await supabase
+      .from('scanned_items')
+      .select('carbon_footprint')
+      .eq('user_id', user.id)
+      .gte('created_at', prevStartDate.toISOString())
+      .lt('created_at', startDate);
+
+    const prevEmissions = prevItems?.reduce((sum, item) => sum + Number(item.carbon_footprint), 0) || 0;
+    const change = prevEmissions > 0 ? ((totalEmissions - prevEmissions) / prevEmissions) * 100 : 0;
+
+    // Calculate category breakdown
+    const categoryData: Record<string, { emissions: number; count: number }> = {};
+    
+    scannedItems.forEach(item => {
+      if (item.item_type === 'receipt' && item.receipt_items) {
+        item.receipt_items.forEach((receiptItem: any) => {
+          const category = receiptItem.category || 'Other';
+          if (!categoryData[category]) {
+            categoryData[category] = { emissions: 0, count: 0 };
+          }
+          categoryData[category].emissions += Number(receiptItem.carbon_footprint);
+          categoryData[category].count += 1;
+        });
+      } else {
+        const category = item.details?.category || 'Other';
+        if (!categoryData[category]) {
+          categoryData[category] = { emissions: 0, count: 0 };
+        }
+        categoryData[category].emissions += Number(item.carbon_footprint);
+        categoryData[category].count += 1;
+      }
     });
 
-    scannedItemsWithCategories?.forEach(item => {
-      const category = item.carbon_categories.name;
-      categoryData[category] = (categoryData[category] || 0) + item.carbon_footprint;
-    });
-
-    const categoryBreakdown = Object.entries(categoryData)
-      .map(([category, emissions]) => ({ category, emissions }))
+    // Format category data for frontend
+    const categories = Object.entries(categoryData)
+      .map(([name, data]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        emissions: Number(data.emissions.toFixed(1)),
+        percentage: totalEmissions > 0 ? Math.round((data.emissions / totalEmissions) * 100) : 0,
+        color: name === 'food' ? 'eco-primary' : 
+               name === 'clothing' ? 'carbon-medium' :
+               name === 'electronics' ? 'carbon-high' : 'muted'
+      }))
       .sort((a, b) => b.emissions - a.emissions);
 
-    // Get recent achievements
-    const { data: achievements } = await supabase
-      .from('user_achievements')
-      .select('*')
-      .eq('user_id', userId)
-      .order('earned_date', { ascending: false })
-      .limit(5);
-
-    // Generate weekly trend data (last 7 days)
-    const weeklyTrend = [];
+    // Calculate weekly breakdown (last 7 days)
+    const weeklyData = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -145,68 +149,61 @@ serve(async (req) => {
       const dayEnd = new Date(date);
       dayEnd.setHours(23, 59, 59, 999);
 
-      const dayReceipts = weeklyReceipts?.filter(r => {
-        const receiptDate = new Date(r.created_at);
-        return receiptDate >= dayStart && receiptDate <= dayEnd;
-      }) || [];
+      const dayItems = scannedItems.filter(item => {
+        const itemDate = new Date(item.created_at);
+        return itemDate >= dayStart && itemDate <= dayEnd;
+      });
 
-      const dayScans = weeklyScans?.filter(s => {
-        const scanDate = new Date(s.scan_date);
-        return scanDate >= dayStart && scanDate <= dayEnd;
-      }) || [];
-
-      const dayTotal = dayReceipts.reduce((sum, r) => sum + (r.total_carbon_footprint || 0), 0) +
-                     dayScans.reduce((sum, s) => sum + (s.carbon_footprint || 0), 0);
-
-      weeklyTrend.push({
-        date: date.toISOString().split('T')[0],
-        emissions: dayTotal
+      const dayEmissions = dayItems.reduce((sum, item) => sum + Number(item.carbon_footprint), 0);
+      
+      weeklyData.push({
+        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        emissions: Number(dayEmissions.toFixed(1))
       });
     }
 
-    logStep("Dashboard data calculated", { 
-      weeklyTotal, 
-      monthlyTotal, 
-      categoriesCount: categoryBreakdown.length 
-    });
+    const responseData = {
+      stats: {
+        total: Number(totalEmissions.toFixed(1)),
+        change: Number(change.toFixed(1)),
+        goal: Number(goal),
+        scans: totalScans
+      },
+      categories,
+      weeklyData,
+      recentItems: scannedItems.slice(0, 10).map(item => ({
+        id: item.id,
+        name: item.item_type === 'receipt' ? `${item.store_name} Receipt` : item.product_name,
+        carbon: Number(item.carbon_footprint),
+        category: item.carbon_category,
+        date: item.created_at,
+        type: item.item_type
+      }))
+    };
 
-    return new Response(JSON.stringify({
-      user: {
-        name: profile?.full_name || 'User',
-        carbonGoal: profile?.carbon_goal || 1000
-      },
-      weekly: {
-        total: weeklyTotal,
-        receipts: weeklyReceiptCarbon,
-        scans: weeklyScanCarbon,
-        trend: weeklyTrend
-      },
-      monthly: {
-        total: monthlyTotal,
-        receipts: monthlyReceiptCarbon,
-        scans: monthlyScanCarbon,
-        goal: profile?.carbon_goal || 1000,
-        progress: Math.min(100, (monthlyTotal / (profile?.carbon_goal || 1000)) * 100)
-      },
-      categories: categoryBreakdown,
-      achievements: achievements || [],
-      insights: {
-        topCategory: categoryBreakdown[0]?.category || 'No data yet',
-        weeklyChange: weeklyTotal > 0 ? ((weeklyTotal - 50) / 50 * 100) : 0, // Mock comparison
-        monthlyProjection: monthlyTotal * (30 / now.getDate())
+    console.log('Dashboard data calculated successfully');
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: responseData
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    );
 
   } catch (error) {
-    logStep("ERROR", { message: error.message });
-    return new Response(JSON.stringify({ 
-      error: error.message 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error('Error getting dashboard data:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 });
