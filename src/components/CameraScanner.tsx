@@ -13,9 +13,11 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [autoCapture, setAutoCapture] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     startCamera();
@@ -23,8 +25,27 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      if (autoTimerRef.current) {
+        clearTimeout(autoTimerRef.current);
+      }
     };
   }, []);
+
+  // Auto-capture when enabled
+  useEffect(() => {
+    if (autoCapture && !capturedImage && videoRef.current) {
+      autoTimerRef.current = setTimeout(() => {
+        capturePhoto();
+        setAutoCapture(false);
+      }, 3000); // 3 second countdown
+    }
+    
+    return () => {
+      if (autoTimerRef.current) {
+        clearTimeout(autoTimerRef.current);
+      }
+    };
+  }, [autoCapture, capturedImage]);
 
   const startCamera = async () => {
     try {
@@ -126,7 +147,7 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
                   />
                   <div className="absolute inset-0 border-2 border-dashed border-eco-primary/50 rounded-lg pointer-events-none">
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white bg-black/50 rounded px-2 py-1 text-sm">
-                      Position receipt or item in frame
+                      {autoCapture ? "Auto-capturing in 3 seconds..." : "Position receipt or item in frame"}
                     </div>
                   </div>
                 </div>
@@ -154,6 +175,13 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
                   <Button onClick={capturePhoto} className="flex-1 bg-gradient-eco">
                     <Camera className="mr-2 h-4 w-4" />
                     Capture
+                  </Button>
+                  <Button 
+                    variant={autoCapture ? "default" : "outline"}
+                    onClick={() => setAutoCapture(!autoCapture)}
+                    className={autoCapture ? "bg-eco-primary" : ""}
+                  >
+                    Auto
                   </Button>
                   <Button 
                     variant="outline" 

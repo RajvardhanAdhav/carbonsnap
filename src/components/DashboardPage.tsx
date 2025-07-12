@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, TrendingDown, TrendingUp, Target, Calendar, Zap, Award, Lightbulb } from "lucide-react";
+import { ArrowLeft, TrendingDown, TrendingUp, Target, Calendar, Zap, Award, Lightbulb, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +13,12 @@ const DashboardPage = () => {
   const [timeframe, setTimeframe] = useState<"week" | "month" | "year">("month");
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [recentScans, setRecentScans] = useState<any[]>([]);
 
   useEffect(() => {
     if (user && session?.access_token) {
       fetchDashboardData();
+      fetchRecentScans();
     }
   }, [user, session, timeframe]);
 
@@ -36,6 +38,38 @@ const DashboardPage = () => {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRecentScans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('scanned_items')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      setRecentScans(data || []);
+    } catch (error) {
+      console.error('Error fetching recent scans:', error);
+    }
+  };
+
+  const deleteScannedItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from('scanned_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+      
+      // Refresh data
+      fetchDashboardData();
+      fetchRecentScans();
+    } catch (error) {
+      console.error('Error deleting item:', error);
     }
   };
 
@@ -237,6 +271,35 @@ const DashboardPage = () => {
             </div>
           </Card>
         </div>
+
+        {/* Recent Scans */}
+        {recentScans.length > 0 && (
+          <Card className="p-6 mt-8">
+            <h3 className="text-lg font-semibold mb-4">Recent Scans</h3>
+            <div className="space-y-3">
+              {recentScans.map((scan) => (
+                <div key={scan.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium">
+                      {scan.item_type === 'receipt' ? scan.store_name : scan.product_name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {scan.carbon_footprint} kg CO₂ • {new Date(scan.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteScannedItem(scan.id)}
+                    className="text-destructive hover:text-destructive/90"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Action Button */}
         <div className="text-center mt-8">
