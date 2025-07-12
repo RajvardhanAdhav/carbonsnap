@@ -2,39 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Carbon Snap Design System - Eco-friendly theme with sustainability colors */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 120 20% 98%;
+    --foreground: 140 15% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 140 15% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 140 15% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 120 40% 90%;
+    --secondary-foreground: 140 15% 15%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 120 30% 95%;
+    --muted-foreground: 140 10% 40%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 165 65% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 120 20% 88%;
+    --input: 120 20% 92%;
+    --ring: 142 76% 36%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 45 100% 51%;
+    --warning-foreground: 0 0% 100%;
+    
+    --eco-primary: 142 76% 36%;
+    --eco-secondary: 165 65% 45%;
+    --eco-light: 120 40% 90%;
+    --eco-dark: 140 30% 25%;
+    
+    --carbon-high: 0 84% 60%;
+    --carbon-medium: 45 100% 51%;
+    --carbon-low: 142 76% 36%;
+    
+    --gradient-eco: linear-gradient(135deg, hsl(var(--eco-primary)), hsl(var(--eco-secondary)));
+    --gradient-carbon: linear-gradient(90deg, hsl(var(--carbon-low)), hsl(var(--carbon-medium)), hsl(var(--carbon-high)));
+    
+    --shadow-eco: 0 10px 30px -10px hsl(var(--eco-primary) / 0.3);
+    --shadow-soft: 0 4px 20px -8px hsl(var(--eco-dark) / 0.15);
 
     --radius: 0.5rem;
 
