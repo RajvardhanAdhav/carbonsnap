@@ -159,6 +159,21 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
   const retakePhoto = () => {
     setCapturedImage(null);
     setProcessedImage(null);
+    
+    // Clear any existing timers
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+    
+    // Reset detection state
+    setReceiptDetected(false);
+    setDetectionConfidence(0);
+    setSharpness(0);
+    setSuggestions([]);
+    
+    // Reset auto-capture if it was enabled
+    setAutoCapture(false);
   };
 
   const confirmPhoto = () => {
