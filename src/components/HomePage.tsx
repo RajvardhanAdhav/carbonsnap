@@ -1,10 +1,15 @@
-import { Camera, Scan, BarChart3, Leaf, Zap, Target } from "lucide-react";
+import { useState } from "react";
+import { Camera, Scan, BarChart3, Leaf, Zap, Target, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import AuthModal from "./AuthModal";
 import heroImage from "@/assets/carbon-snap-hero.jpg";
 
 const HomePage = () => {
+  const { user, signOut } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const features = [
     {
       icon: Camera,
@@ -34,8 +39,35 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-eco-light">
+      {/* Navigation */}
+      <nav className="absolute top-0 left-0 right-0 z-10 p-4">
+        <div className="container mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2 text-eco-primary">
+            <Leaf className="h-6 w-6" />
+            <span className="font-semibold">Carbon Snap</span>
+          </div>
+          
+          {user ? (
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                Welcome, {user.user_metadata?.full_name || user.email}
+              </span>
+              <Button variant="outline" size="sm" onClick={signOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setShowAuthModal(true)}>
+              <User className="h-4 w-4 mr-2" />
+              Sign In
+            </Button>
+          )}
+        </div>
+      </nav>
+
       {/* Hero Section */}
-      <section className="relative overflow-hidden px-4 py-16 lg:py-24">
+      <section className="relative overflow-hidden px-4 py-16 lg:py-24 pt-24">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8 animate-fade-in">
@@ -58,18 +90,42 @@ const HomePage = () => {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/scanner">
-                  <Button size="lg" className="w-full sm:w-auto bg-gradient-eco hover:opacity-90 shadow-eco">
-                    <Camera className="mr-2 h-5 w-5" />
-                    Start Scanning
-                  </Button>
-                </Link>
-                <Link to="/dashboard">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                    <BarChart3 className="mr-2 h-5 w-5" />
-                    View Dashboard
-                  </Button>
-                </Link>
+                {user ? (
+                  <>
+                    <Link to="/scanner">
+                      <Button size="lg" className="w-full sm:w-auto bg-gradient-eco hover:opacity-90 shadow-eco">
+                        <Camera className="mr-2 h-5 w-5" />
+                        Start Scanning
+                      </Button>
+                    </Link>
+                    <Link to="/dashboard">
+                      <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                        <BarChart3 className="mr-2 h-5 w-5" />
+                        View Dashboard
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Button 
+                      size="lg" 
+                      className="w-full sm:w-auto bg-gradient-eco hover:opacity-90 shadow-eco"
+                      onClick={() => setShowAuthModal(true)}
+                    >
+                      <Camera className="mr-2 h-5 w-5" />
+                      Get Started
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="lg" 
+                      className="w-full sm:w-auto"
+                      onClick={() => setShowAuthModal(true)}
+                    >
+                      <BarChart3 className="mr-2 h-5 w-5" />
+                      Learn More
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
             
@@ -135,15 +191,29 @@ const HomePage = () => {
             <p className="text-xl opacity-90 max-w-2xl mx-auto">
               Join thousands of users reducing their carbon footprint one scan at a time
             </p>
-            <Link to="/scanner">
-              <Button size="lg" variant="secondary" className="bg-white text-eco-primary hover:bg-white/90">
+            {user ? (
+              <Link to="/scanner">
+                <Button size="lg" variant="secondary" className="bg-white text-eco-primary hover:bg-white/90">
+                  <Camera className="mr-2 h-5 w-5" />
+                  Start Your Journey
+                </Button>
+              </Link>
+            ) : (
+              <Button 
+                size="lg" 
+                variant="secondary" 
+                className="bg-white text-eco-primary hover:bg-white/90"
+                onClick={() => setShowAuthModal(true)}
+              >
                 <Camera className="mr-2 h-5 w-5" />
                 Start Your Journey
               </Button>
-            </Link>
+            )}
           </div>
         </div>
       </section>
+
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 };
