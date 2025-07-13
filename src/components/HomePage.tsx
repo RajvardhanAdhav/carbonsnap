@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Camera, Scan, BarChart3, Leaf, Zap, Target, LogOut, User } from "lucide-react";
+import { Camera, Scan, BarChart3, Leaf, Zap, Target, LogOut, User, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -52,6 +52,12 @@ const HomePage = () => {
               <span className="text-sm text-muted-foreground">
                 Welcome, {user.user_metadata?.full_name || user.email}
               </span>
+              <Link to="/settings">
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </Button>
+              </Link>
               <Button variant="outline" size="sm" onClick={signOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
