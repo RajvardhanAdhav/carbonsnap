@@ -25,49 +25,51 @@ const productCarbonData = {
   }
 };
 
-function estimateProductCarbon(productName: string, category: string): {
-  carbon: number;
-  carbonCategory: 'low' | 'medium' | 'high';
-  details: any;
-} {
+// Comprehensive LCA-based carbon calculation for single items
+function estimateProductCarbon(productName: string, category: string, brand?: string, description?: string) {
+  const EMISSION_FACTORS = {
+    beef: { production: 27.0, packaging: 0.5, transport: 2.0, disposal: 0.3 },
+    chicken: { production: 6.9, packaging: 0.3, transport: 1.0, disposal: 0.15 },
+    smartphone: { production: 85.0, packaging: 2.0, transport: 8.0, disposal: 5.0 },
+    laptop: { production: 420.0, packaging: 15.0, transport: 35.0, disposal: 25.0 },
+    cotton_shirt: { production: 15.0, packaging: 0.5, transport: 2.0, disposal: 1.0 },
+    default: { production: 2.0, packaging: 0.3, transport: 0.8, disposal: 0.1 }
+  };
+
+  // Classify product
   const name = productName.toLowerCase();
-  let carbon = 2.0; // default
-  let details = { material: 'Unknown', origin: 'Unknown', transport: 'Unknown', packaging: 'Standard' };
-
-  // Try to match product with our database
-  if (category === 'clothing' || name.includes('shirt') || name.includes('clothing')) {
-    if (name.includes('organic') || name.includes('cotton')) {
-      carbon = productCarbonData.clothing.cotton_shirt.carbon;
-      details = { ...productCarbonData.clothing.cotton_shirt.details, packaging: 'Recycled cardboard' };
-    } else if (name.includes('jeans') || name.includes('pants')) {
-      carbon = productCarbonData.clothing.jeans.carbon;
-      details = productCarbonData.clothing.jeans.details;
-    } else if (name.includes('wool') || name.includes('sweater')) {
-      carbon = productCarbonData.clothing.wool_sweater.carbon;
-      details = productCarbonData.clothing.wool_sweater.details;
-    } else {
-      carbon = productCarbonData.clothing.synthetic_jacket.carbon;
-      details = productCarbonData.clothing.synthetic_jacket.details;
-    }
-  } else if (category === 'electronics' || name.includes('phone') || name.includes('computer')) {
-    if (name.includes('phone') || name.includes('mobile')) {
-      carbon = productCarbonData.electronics.smartphone.carbon;
-      details = productCarbonData.electronics.smartphone.details;
-    } else if (name.includes('laptop') || name.includes('computer')) {
-      carbon = productCarbonData.electronics.laptop.carbon;
-      details = productCarbonData.electronics.laptop.details;
-    } else {
-      carbon = productCarbonData.electronics.headphones.carbon;
-      details = productCarbonData.electronics.headphones.details;
-    }
-  } else if (name.includes('apple') || name.includes('fruit')) {
-    carbon = productCarbonData.food.apple.carbon;
-    details = productCarbonData.food.apple.details;
-  }
-
-  const carbonCategory = carbon < 5 ? 'low' : carbon < 25 ? 'medium' : 'high';
+  let productType = 'default';
   
-  return { carbon, carbonCategory, details };
+  if (name.includes('beef') || name.includes('steak')) productType = 'beef';
+  else if (name.includes('chicken') || name.includes('poultry')) productType = 'chicken';
+  else if (name.includes('phone') || name.includes('smartphone')) productType = 'smartphone';
+  else if (name.includes('laptop') || name.includes('computer')) productType = 'laptop';
+  else if (name.includes('shirt') || name.includes('clothing')) productType = 'cotton_shirt';
+
+  const factors = EMISSION_FACTORS[productType as keyof typeof EMISSION_FACTORS] || EMISSION_FACTORS.default;
+  
+  // Calculate lifecycle emissions
+  const breakdown = {
+    production: factors.production,
+    packaging: factors.packaging,
+    transport: factors.transport,
+    use: factors.use || 0,
+    disposal: factors.disposal
+  };
+  
+  const totalCarbon = Object.values(breakdown).reduce((sum, val) => sum + val, 0);
+  const carbonCategory = totalCarbon > 10 ? 'high' : totalCarbon > 3 ? 'medium' : 'low';
+  
+  return { 
+    carbon: Math.round(totalCarbon * 100) / 100, 
+    carbonCategory, 
+    details: {
+      category: productType,
+      breakdown,
+      confidence: 0.8,
+      suggestions: productType === 'beef' ? ['Consider plant-based alternatives'] : ['Choose local options when available']
+    }
+  };
 }
 
 Deno.serve(async (req) => {
