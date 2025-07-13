@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Camera, Upload, Scan, Receipt, Package, ArrowLeft, CheckCircle, Edit, Loader2 } from "lucide-react";
+import { Camera, Upload, Scan, Receipt, Package, ArrowLeft, CheckCircle, Edit, Loader2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import CameraScanner from "./CameraScanner";
 import ManualInputModal from "./ManualInputModal";
+import { BarcodeScanner } from "./enhanced/BarcodeScanner";
+import { ReductionTipsEngine } from "./enhanced/ReductionTipsEngine";
 
-type ScanMode = "receipt" | "item";
+type ScanMode = "receipt" | "item" | "barcode";
 
 const ScannerPage = () => {
   const { user, session } = useAuth();
@@ -17,6 +19,8 @@ const ScannerPage = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [showReductionTips, setShowReductionTips] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
 
   const processImage = async (imageData: string, scanMethod: string = 'camera') => {
@@ -114,6 +118,38 @@ const ScannerPage = () => {
     }
   };
 
+  const handleBarcodeDetected = async (barcode: string, productData?: any) => {
+    if (!user || !session?.access_token) {
+      throw new Error('User not authenticated');
+    }
+
+    setIsScanning(true);
+    setShowBarcodeScanner(false);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('scan-item', {
+        body: { 
+          productName: productData?.name || 'Scanned Product',
+          brand: productData?.brand || 'Unknown',
+          barcode,
+          scanMethod: 'barcode',
+          category: productData?.category || 'general'
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      setScanResult({ type: 'item', ...data.data });
+    } catch (error) {
+      console.error('Error processing barcode:', error);
+      alert('Failed to process barcode. Please try again.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   const getCarbonColor = (category: string) => {
     switch (category) {
       case "low": return "carbon-low";
@@ -158,7 +194,7 @@ const ScannerPage = () => {
             {/* Scan Mode Selection */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-center mb-6">What would you like to scan?</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card 
                   className={`p-6 text-center cursor-pointer transition-all border-2 ${
                     scanMode === "receipt" 
@@ -183,6 +219,19 @@ const ScannerPage = () => {
                   <Package className="h-12 w-12 mx-auto mb-4 text-eco-primary" />
                   <h3 className="font-semibold mb-2">Single Item</h3>
                   <p className="text-sm text-muted-foreground">Scan individual product</p>
+                </Card>
+
+                <Card 
+                  className={`p-6 text-center cursor-pointer transition-all border-2 ${
+                    scanMode === "barcode" 
+                      ? "border-eco-primary bg-eco-primary/5" 
+                      : "border-border hover:border-eco-primary/50"
+                  }`}
+                  onClick={() => setScanMode("barcode")}
+                >
+                  <Scan className="h-12 w-12 mx-auto mb-4 text-eco-primary" />
+                  <h3 className="font-semibold mb-2">Barcode</h3>
+                  <p className="text-sm text-muted-foreground">Scan product barcode</p>
                 </Card>
               </div>
             </div>
@@ -210,24 +259,45 @@ const ScannerPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <Button 
-                    onClick={() => setShowCamera(true)}
-                    disabled={isScanning}
-                    size="lg" 
-                    className="w-full bg-gradient-eco hover:opacity-90"
-                  >
-                    {isScanning ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="mr-2 h-5 w-5" />
-                        Open Camera
-                      </>
-                    )}
-                  </Button>
+                  {scanMode === "barcode" ? (
+                    <Button 
+                      onClick={() => setShowBarcodeScanner(true)}
+                      disabled={isScanning}
+                      size="lg" 
+                      className="w-full bg-gradient-eco hover:opacity-90"
+                    >
+                      {isScanning ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Scan className="mr-2 h-5 w-5" />
+                          Scan Barcode
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={() => setShowCamera(true)}
+                      disabled={isScanning}
+                      size="lg" 
+                      className="w-full bg-gradient-eco hover:opacity-90"
+                    >
+                      {isScanning ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="mr-2 h-5 w-5" />
+                          Open Camera
+                        </>
+                      )}
+                    </Button>
+                  )}
                   
                   <Button 
                     variant="outline" 
@@ -327,18 +397,54 @@ const ScannerPage = () => {
               </Card>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button 
                 variant="outline" 
                 onClick={() => {setScanResult(null); setIsScanning(false);}}
               >
                 Scan Another
               </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setShowReductionTips(true)}
+              >
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Get Tips
+              </Button>
               <Link to="/dashboard">
                 <Button className="w-full bg-gradient-eco hover:opacity-90">
                   View Dashboard
                 </Button>
               </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Barcode Scanner */}
+        {showBarcodeScanner && (
+          <BarcodeScanner
+            onBarcodeDetected={handleBarcodeDetected}
+            onCancel={() => setShowBarcodeScanner(false)}
+            isActive={showBarcodeScanner}
+          />
+        )}
+
+        {/* Reduction Tips Modal */}
+        {showReductionTips && scanResult && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+            <div className="bg-background rounded-lg w-full max-w-4xl mt-8 mb-8">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold">Reduction Tips</h2>
+                  <Button variant="ghost" onClick={() => setShowReductionTips(false)}>
+                    ×
+                  </Button>
+                </div>
+                <ReductionTipsEngine
+                  items={scanResult.type === 'receipt' ? scanResult.items : [scanResult]}
+                  totalEmissions={scanResult.type === 'receipt' ? scanResult.totalCarbon : scanResult.carbon}
+                />
+              </div>
             </div>
           </div>
         )}

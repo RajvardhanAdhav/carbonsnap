@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { AdvancedDashboard } from "@/components/enhanced/AdvancedDashboard";
 
 const DashboardPage = () => {
   const { user, session } = useAuth();
@@ -25,15 +26,27 @@ const DashboardPage = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('get-dashboard-data', {
-        body: {},
+      // Try enhanced dashboard first, fallback to basic
+      const { data, error } = await supabase.functions.invoke('get-enhanced-dashboard-data', {
+        body: { timeframe },
         headers: {
           Authorization: `Bearer ${session?.access_token}`,
         },
       });
 
-      if (error) throw error;
-      setDashboardData(data.data);
+      if (error) {
+        // Fallback to basic dashboard
+        const { data: basicData, error: basicError } = await supabase.functions.invoke('get-dashboard-data', {
+          body: {},
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+        });
+        if (basicError) throw basicError;
+        setDashboardData(basicData.data);
+      } else {
+        setDashboardData(data.data);
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -186,49 +199,8 @@ const DashboardPage = () => {
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {/* Weekly Emissions Chart */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Weekly Emissions</h3>
-            <div className="space-y-3">
-              {weeklyData.map((day, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <span className="text-sm font-medium w-8">{day.day}</span>
-                  <div className="flex-1 bg-muted rounded-full h-2 relative">
-                    <div 
-                      className="bg-gradient-eco h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${(day.emissions / maxEmissions) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-sm text-muted-foreground w-12 text-right">
-                    {day.emissions} kg
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Category Breakdown */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Emissions by Category</h3>
-            <div className="space-y-4">
-              {categoryData.map((category, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">{category.name}</span>
-                    <span className="text-sm text-muted-foreground">{category.emissions} kg</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className={`bg-${category.color} h-2 rounded-full transition-all duration-500`}
-                      style={{ width: `${category.percentage}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+        {/* Enhanced Dashboard */}
+        <AdvancedDashboard timeframe={timeframe} />
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Achievements */}
