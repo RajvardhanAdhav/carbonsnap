@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { productClassificationService } from '@/services/productClassificationService';
+// @ts-ignore - Quagga library doesn't have proper TypeScript definitions
+import Quagga from 'quagga';
 
 interface BarcodeScannerProps {
   onBarcodeDetected: (barcode: string, productData?: any) => void;
@@ -102,42 +104,63 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Simulate barcode detection
-    // In a real implementation, you would use a barcode detection library like:
-    // - QuaggaJS
-    // - ZXing-js
-    // - @zxing/library
-    const simulatedBarcode = await simulateBarcodeDetection(canvas);
+    // Convert canvas to image data for Quagga
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
     
-    if (simulatedBarcode) {
-      setDetectedBarcode(simulatedBarcode);
-      setScanning(false);
-      
-      // Fetch product data
-      try {
-        const product = await productClassificationService.searchProductByBarcode(simulatedBarcode);
-        setProductData(product);
-      } catch (error) {
-        console.error('Error fetching product data:', error);
-      }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        Quagga.decodeSingle({
+          src: imageData,
+          numOfWorkers: 0,
+          inputStream: {
+            size: 800
+          },
+          locator: {
+            patchSize: "medium",
+            halfSample: true
+          },
+          decoder: {
+            readers: [
+              "code_128_reader",
+              "ean_reader", 
+              "ean_8_reader",
+              "code_39_reader",
+              "code_39_vin_reader",
+              "codabar_reader",
+              "upc_reader",
+              "upc_e_reader",
+              "i2of5_reader"
+            ]
+          }
+        }, (result) => {
+          if (result && result.codeResult) {
+            const barcode = result.codeResult.code;
+            const format = result.codeResult.format;
+            
+            console.log(`Detected ${format} barcode: ${barcode}`);
+            
+            // Only process valid barcodes (minimum length and valid format)
+            if (barcode && barcode.length >= 8 && /^[0-9]+$/.test(barcode)) {
+              setDetectedBarcode(barcode);
+              setScanning(false);
+              
+              // Fetch product data
+              productClassificationService.searchProductByBarcode(barcode)
+                .then(setProductData)
+                .catch((error) => {
+                  console.error('Error fetching product data:', error);
+                  setProductData(null);
+                });
+            }
+          }
+          resolve();
+        });
+      });
+    } catch (error) {
+      console.error('Barcode scanning error:', error);
     }
   };
 
-  // Real barcode detection using user input (simulated for demo)
-  const simulateBarcodeDetection = async (canvas: HTMLCanvasElement): Promise<string | null> => {
-    // For demo purposes, let user click to trigger barcode detection
-    // In production, integrate a real barcode scanning library like:
-    // - QuaggaJS: npm install quagga
-    // - ZXing-js: npm install @zxing/library
-    // - BarcodeDetector API (experimental)
-    
-    // Simulate finding a real barcode after a few seconds
-    if (Math.random() < 0.15) { // 15% chance each scan
-      // Return a real-world barcode for testing
-      return '3017620422003'; // Nutella barcode for testing
-    }
-    return null;
-  };
 
   const handleBarcodeConfirm = () => {
     if (detectedBarcode) {
