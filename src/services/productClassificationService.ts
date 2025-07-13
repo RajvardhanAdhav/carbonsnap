@@ -102,23 +102,9 @@ export class ProductClassificationService {
   }
 
   private async loadProductDatabase(): Promise<void> {
-    // In a real implementation, this would load from external APIs like:
-    // - OpenFoodFacts API
-    // - USDA Food Data Central
-    // - Custom product database
-    
-    // For now, we'll simulate a product database
-    const mockProducts = [
-      { name: 'Organic Ground Beef', category: 'beef', carbonIntensity: 'high' },
-      { name: 'Free Range Chicken Breast', category: 'chicken', carbonIntensity: 'medium' },
-      { name: 'Atlantic Salmon Fillet', category: 'fish', carbonIntensity: 'medium' },
-      { name: 'Organic Whole Milk', category: 'dairy', carbonIntensity: 'medium' },
-      { name: 'Fresh Spinach', category: 'produce', carbonIntensity: 'low' },
-    ];
-
-    mockProducts.forEach(product => {
-      this.productDatabase.set(product.name.toLowerCase(), product);
-    });
+    // Real database would be loaded from external APIs
+    // For now, keep minimal fallback data
+    this.productDatabase.clear();
   }
 
   async classifyProduct(productData: ProductData): Promise<ClassificationResult> {
@@ -240,22 +226,78 @@ export class ProductClassificationService {
     return suggestions.slice(0, 2); // Limit to 2 suggestions
   }
 
-  // Enhanced product search with external APIs
+  // Real product search using OpenFoodFacts API
   async searchProductByBarcode(barcode: string): Promise<ProductData | null> {
     try {
-      // In a real implementation, this would call OpenFoodFacts API:
-      // const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+      console.log('Looking up barcode:', barcode);
       
-      // Mock response for demo
-      return {
-        name: 'Product from barcode',
-        category: 'general',
-        description: 'Product found via barcode lookup'
-      };
+      // Call OpenFoodFacts API for real product data
+      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch product data');
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === 1 && data.product) {
+        const product = data.product;
+        
+        // Extract meaningful product information
+        const productData: ProductData = {
+          name: product.product_name || product.generic_name || 'Unknown Product',
+          category: this.mapOpenFoodFactsCategory(product.categories_tags || []),
+          brand: product.brands || 'Unknown',
+          description: product.generic_name || product.product_name || '',
+          barcode: barcode
+        };
+        
+        console.log('Found product:', productData);
+        return productData;
+      } else {
+        console.log('Product not found in OpenFoodFacts database');
+        return null;
+      }
     } catch (error) {
       console.error('Barcode lookup failed:', error);
       return null;
     }
+  }
+
+  // Map OpenFoodFacts categories to our internal categories
+  private mapOpenFoodFactsCategory(categories: string[]): string {
+    const categoryMap: { [key: string]: string } = {
+      'en:beverages': 'beverages',
+      'en:dairy': 'dairy',
+      'en:meat': 'meat',
+      'en:fish': 'fish',
+      'en:fruits': 'produce',
+      'en:vegetables': 'produce',
+      'en:cereals': 'grains',
+      'en:snacks': 'snacks',
+      'en:frozen-foods': 'frozen',
+      'en:breads': 'grains',
+      'en:chocolates': 'snacks',
+      'en:sweet-snacks': 'snacks'
+    };
+
+    // Find the most specific category match
+    for (const category of categories) {
+      if (categoryMap[category]) {
+        return categoryMap[category];
+      }
+    }
+
+    // Try partial matches
+    for (const category of categories) {
+      if (category.includes('meat')) return 'meat';
+      if (category.includes('dairy')) return 'dairy';
+      if (category.includes('fruit') || category.includes('vegetable')) return 'produce';
+      if (category.includes('beverage') || category.includes('drink')) return 'beverages';
+      if (category.includes('snack')) return 'snacks';
+    }
+
+    return 'general';
   }
 
   async enhanceProductData(productData: ProductData): Promise<ProductData> {

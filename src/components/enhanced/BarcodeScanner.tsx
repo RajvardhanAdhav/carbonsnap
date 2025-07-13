@@ -123,18 +123,18 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
     }
   };
 
-  // Simulated barcode detection for demo purposes
+  // Real barcode detection using user input (simulated for demo)
   const simulateBarcodeDetection = async (canvas: HTMLCanvasElement): Promise<string | null> => {
-    // In a real implementation, this would analyze the canvas for barcode patterns
-    // For demo, we'll return a random barcode occasionally
-    if (Math.random() < 0.1) { // 10% chance each scan
-      const mockBarcodes = [
-        '0123456789012',
-        '1234567890123',
-        '2345678901234',
-        '3456789012345'
-      ];
-      return mockBarcodes[Math.floor(Math.random() * mockBarcodes.length)];
+    // For demo purposes, let user click to trigger barcode detection
+    // In production, integrate a real barcode scanning library like:
+    // - QuaggaJS: npm install quagga
+    // - ZXing-js: npm install @zxing/library
+    // - BarcodeDetector API (experimental)
+    
+    // Simulate finding a real barcode after a few seconds
+    if (Math.random() < 0.15) { // 15% chance each scan
+      // Return a real-world barcode for testing
+      return '3017620422003'; // Nutella barcode for testing
     }
     return null;
   };
@@ -248,6 +248,33 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
             )}
 
             <canvas ref={canvasRef} className="hidden" />
+
+            {/* Manual Barcode Input for Testing */}
+            {!detectedBarcode && !scanning && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground text-center">
+                  For testing, enter a barcode manually:
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter barcode (e.g., 3017620422003)"
+                    className="flex-1 px-3 py-2 border rounded-md text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const barcode = (e.target as HTMLInputElement).value.trim();
+                        if (barcode) {
+                          setDetectedBarcode(barcode);
+                          productClassificationService.searchProductByBarcode(barcode)
+                            .then(setProductData)
+                            .catch(console.error);
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Controls */}
             <div className="flex gap-3">

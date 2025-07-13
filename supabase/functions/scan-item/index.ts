@@ -5,25 +5,68 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Carbon footprint database for different product categories
-const productCarbonData = {
-  clothing: {
-    cotton_shirt: { carbon: 5.4, details: { material: '100% Cotton', origin: 'India', transport: 'Sea freight' } },
-    jeans: { carbon: 33.4, details: { material: 'Cotton/Polyester blend', origin: 'Bangladesh', transport: 'Sea freight' } },
-    wool_sweater: { carbon: 47.2, details: { material: '100% Wool', origin: 'China', transport: 'Air freight' } },
-    synthetic_jacket: { carbon: 26.5, details: { material: 'Polyester', origin: 'Vietnam', transport: 'Sea freight' } }
-  },
-  electronics: {
-    smartphone: { carbon: 70.0, details: { material: 'Aluminum/Glass/Silicon', origin: 'China', transport: 'Air freight' } },
-    laptop: { carbon: 300.0, details: { material: 'Aluminum/Plastic/Silicon', origin: 'Taiwan', transport: 'Air freight' } },
-    headphones: { carbon: 8.5, details: { material: 'Plastic/Metal', origin: 'China', transport: 'Sea freight' } }
-  },
-  food: {
-    apple: { carbon: 0.4, details: { material: 'Organic', origin: 'Local farm', transport: 'Truck' } },
-    banana: { carbon: 0.6, details: { material: 'Conventional', origin: 'Ecuador', transport: 'Ship/Truck' } },
-    bread: { carbon: 1.2, details: { material: 'Wheat flour', origin: 'Local bakery', transport: 'Local delivery' } }
+// Enhanced product lookup using real data
+async function lookupProductByBarcode(barcode: string) {
+  try {
+    console.log('Looking up barcode in OpenFoodFacts:', barcode);
+    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch from OpenFoodFacts');
+    }
+    
+    const data = await response.json();
+    
+    if (data.status === 1 && data.product) {
+      const product = data.product;
+      return {
+        name: product.product_name || product.generic_name || 'Unknown Product',
+        brand: product.brands || 'Unknown',
+        category: mapCategory(product.categories_tags || []),
+        description: product.generic_name || product.product_name || '',
+        nutritionGrade: product.nutrition_grade_fr || null,
+        ecoScore: product.ecoscore_score || null
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('OpenFoodFacts lookup failed:', error);
+    return null;
   }
-};
+}
+
+function mapCategory(categories: string[]): string {
+  const categoryMap: { [key: string]: string } = {
+    'en:beverages': 'beverages',
+    'en:dairy': 'dairy', 
+    'en:meat': 'meat',
+    'en:fish': 'fish',
+    'en:fruits': 'produce',
+    'en:vegetables': 'produce',
+    'en:cereals': 'grains',
+    'en:snacks': 'snacks',
+    'en:frozen-foods': 'frozen',
+    'en:breads': 'grains',
+    'en:chocolates': 'snacks'
+  };
+
+  for (const category of categories) {
+    if (categoryMap[category]) {
+      return categoryMap[category];
+    }
+  }
+  
+  // Fallback matches
+  for (const category of categories) {
+    if (category.includes('meat')) return 'meat';
+    if (category.includes('dairy')) return 'dairy';
+    if (category.includes('fruit') || category.includes('vegetable')) return 'produce';
+    if (category.includes('beverage')) return 'beverages';
+  }
+  
+  return 'general';
+}
 
 // Comprehensive LCA-based carbon calculation for single items
 function estimateProductCarbon(productName: string, category: string, brand?: string, description?: string) {
@@ -104,10 +147,24 @@ Deno.serve(async (req) => {
       throw new Error('Authentication required');
     }
 
-    console.log('Processing single item for user:', user.id, 'Product:', productName);
+    console.log('Processing single item for user:', user.id, 'Product:', productName, 'Barcode:', barcode);
+
+    // Try to get real product data if barcode is provided
+    let enhancedProductData = null;
+    if (barcode) {
+      enhancedProductData = await lookupProductByBarcode(barcode);
+      if (enhancedProductData) {
+        console.log('Found real product data:', enhancedProductData);
+      }
+    }
+
+    // Use real product data if available, otherwise use provided data
+    const finalProductName = enhancedProductData?.name || productName;
+    const finalBrand = enhancedProductData?.brand || brand;
+    const finalCategory = enhancedProductData?.category || category;
 
     // Estimate carbon footprint
-    const { carbon, carbonCategory, details } = estimateProductCarbon(productName, category);
+    const { carbon, carbonCategory, details } = estimateProductCarbon(finalProductName, finalCategory);
 
     // Store the scanned item
     const { data: scannedItem, error: insertError } = await supabase
@@ -115,13 +172,16 @@ Deno.serve(async (req) => {
       .insert({
         user_id: user.id,
         item_type: 'single_item',
-        product_name: productName,
-        brand: brand,
+        product_name: finalProductName,
+        brand: finalBrand,
         barcode: barcode,
         carbon_footprint: carbon,
         carbon_category: carbonCategory,
         scan_method: scanMethod,
-        details: details
+        details: {
+          ...details,
+          realProductData: enhancedProductData
+        }
       })
       .select()
       .single();
@@ -138,11 +198,14 @@ Deno.serve(async (req) => {
         success: true,
         data: {
           id: scannedItem.id,
-          name: productName,
-          brand: brand,
+          name: finalProductName,
+          brand: finalBrand,
           carbon: carbon,
           category: carbonCategory,
-          details: details
+          details: {
+            ...details,
+            realProductData: enhancedProductData
+          }
         }
       }),
       { 
