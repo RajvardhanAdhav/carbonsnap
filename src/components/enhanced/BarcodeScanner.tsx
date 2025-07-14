@@ -272,16 +272,16 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
 
             <canvas ref={canvasRef} className="hidden" />
 
-            {/* Manual Barcode Input for Testing */}
+            {/* Manual Barcode Input */}
             {!detectedBarcode && !scanning && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground text-center">
-                  For testing, enter a barcode manually:
+                  Or enter a barcode manually:
                 </p>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Enter barcode (e.g., 3017620422003)"
+                    placeholder="Enter product barcode"
                     className="flex-1 px-3 py-2 border rounded-md text-sm"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {

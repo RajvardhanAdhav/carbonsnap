@@ -78,48 +78,25 @@ export function AdvancedDashboard({ timeframe }: AdvancedDashboardProps) {
       setDashboardData(data.data);
     } catch (error) {
       console.error('Error fetching enhanced dashboard data:', error);
-      // Fallback to mock data
-      setDashboardData(getMockDashboardData());
+      // Show error state instead of mock data
+      setDashboardData(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const getMockDashboardData = (): DashboardData => ({
+  const getEmptyDashboardData = (): DashboardData => ({
     stats: {
-      total: 45.8,
-      change: -12.5,
+      total: 0,
+      change: 0,
       goal: 60,
-      scans: 127,
-      carbonSaved: 18.3
+      scans: 0,
+      carbonSaved: 0
     },
-    categories: [
-      { name: 'Meat & Dairy', emissions: 28.4, percentage: 62, color: COLORS.high, count: 23 },
-      { name: 'Produce', emissions: 8.2, percentage: 18, color: COLORS.low, count: 45 },
-      { name: 'Grains', emissions: 5.1, percentage: 11, color: COLORS.medium, count: 31 },
-      { name: 'Beverages', emissions: 2.8, percentage: 6, color: COLORS.medium, count: 18 },
-      { name: 'Other', emissions: 1.3, percentage: 3, color: COLORS.eco, count: 10 }
-    ],
-    weeklyData: [
-      { day: 'Mon', emissions: 6.2, scans: 3 },
-      { day: 'Tue', emissions: 8.1, scans: 5 },
-      { day: 'Wed', emissions: 5.9, scans: 4 },
-      { day: 'Thu', emissions: 7.3, scans: 6 },
-      { day: 'Fri', emissions: 9.8, scans: 8 },
-      { day: 'Sat', emissions: 4.2, scans: 7 },
-      { day: 'Sun', emissions: 4.3, scans: 4 }
-    ],
-    monthlyTrend: [
-      { month: 'Jan', emissions: 52.3, goal: 60 },
-      { month: 'Feb', emissions: 48.7, goal: 60 },
-      { month: 'Mar', emissions: 51.2, goal: 60 },
-      { month: 'Apr', emissions: 45.8, goal: 60 }
-    ],
-    topItems: [
-      { name: 'Ground Beef (1 lb)', emissions: 12.2, category: 'Meat', suggestions: ['Try plant-based alternatives', 'Consider chicken instead'] },
-      { name: 'Cheese Block', emissions: 4.8, category: 'Dairy', suggestions: ['Look for plant-based cheese', 'Buy in smaller quantities'] },
-      { name: 'Frozen Pizza', emissions: 3.2, category: 'Processed', suggestions: ['Make homemade pizza', 'Choose vegetarian options'] }
-    ]
+    categories: [],
+    weeklyData: [],
+    monthlyTrend: [],
+    topItems: []
   });
 
   const exportData = async () => {
@@ -153,7 +130,18 @@ export function AdvancedDashboard({ timeframe }: AdvancedDashboardProps) {
     );
   }
 
-  if (!dashboardData) return null;
+  if (!dashboardData) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-8 text-center">
+          <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
+          <p className="text-muted-foreground">
+            Start scanning items to see your carbon footprint analytics
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   const progressPercentage = Math.min((dashboardData.stats.total / dashboardData.stats.goal) * 100, 100);
 

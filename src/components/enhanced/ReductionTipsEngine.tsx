@@ -90,7 +90,7 @@ export function ReductionTipsEngine({ items, totalEmissions, onTipSelect }: Redu
           targetItems: [item.name],
           icon: Leaf,
           actionText: 'Find Alternatives',
-          learnMoreUrl: 'https://example.com/plant-based-meat'
+          learnMoreUrl: 'https://www.worldwildlife.org/stories/what-are-the-biggest-drivers-of-tropical-deforestation'
         });
         break;
 

@@ -198,32 +198,18 @@ function generateEquivalents(totalEmissions: number): string[] {
 function processReceiptImage(imageData: string): ProcessedReceipt {
   const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
   
-  const stores = ["Whole Foods Market", "Fresh Market", "Green Grocer", "Eco Store", "Local Co-op"];
-  const mockItems = [
-    { name: "Grass-Fed Ground Beef 1.5lb", price: 12.99 },
-    { name: "Organic Free-Range Eggs", price: 4.49 },
-    { name: "Wild Salmon Fillet 1lb", price: 18.99 },
-    { name: "Organic Bananas 2lb", price: 2.15 },
-    { name: "Local Organic Spinach", price: 2.99 },
-    { name: "Almond Milk 64oz", price: 3.49 },
-    { name: "Whole Wheat Bread", price: 3.49 },
-    { name: "Quinoa 1lb", price: 4.99 },
-  ];
+  // Note: This function is for development/testing purposes
+  // In production, this should use actual OCR processing
+  console.log('Processing receipt image - this is a placeholder implementation');
   
-  const storeName = stores[Math.floor(Math.random() * stores.length)];
-  const numItems = Math.floor(Math.random() * 4) + 3; // 3-6 items
-  const selectedItems = [];
-  
-  for (let i = 0; i < numItems; i++) {
-    const item = mockItems[Math.floor(Math.random() * mockItems.length)];
-    const quantity = Math.floor(Math.random() * 2) + 1;
-    
-    const result = calculateItemEmissions(item.name, quantity, storeName);
-    
-    selectedItems.push({
-      name: result.name,
-      quantity: `${result.quantity} ${result.unit}`,
-      carbon: result.emissions_kg,
+  return {
+    store: "Receipt Processing",
+    date: new Date().toISOString().split('T')[0],
+    items: [],
+    total: 0,
+    carbon_footprint: 0,
+    confidence: 0.1,
+    note: "Real OCR processing not implemented. Please use barcode scanning or manual input."
       category: result.emissions_kg > 8 ? 'high' : result.emissions_kg > 3 ? 'medium' : 'low',
       price: item.price * quantity,
       breakdown: result.breakdown,

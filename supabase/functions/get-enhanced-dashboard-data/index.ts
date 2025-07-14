@@ -259,13 +259,33 @@ function calculateWeeklyData(items: any[], timeframe: string): WeeklyData[] {
   const weeklyData: WeeklyData[] = days.map(day => ({ day, emissions: 0, scans: 0 }));
   
   if (timeframe !== 'week') {
-    // For month/year, show sample weekly pattern
-    return [
-      { day: 'Week 1', emissions: 12.4, scans: 8 },
-      { day: 'Week 2', emissions: 15.2, scans: 12 },
-      { day: 'Week 3', emissions: 10.8, scans: 6 },
-      { day: 'Week 4', emissions: 13.6, scans: 10 }
-    ];
+    // For month/year, calculate weekly aggregates from actual data
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const weeksInMonth = Math.ceil((now.getDate() + startOfMonth.getDay()) / 7);
+    
+    const weeklyData: WeeklyData[] = [];
+    for (let week = 1; week <= weeksInMonth; week++) {
+      const weekStart = new Date(startOfMonth);
+      weekStart.setDate(((week - 1) * 7) - startOfMonth.getDay() + 1);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      
+      const weekItems = items.filter(item => {
+        const itemDate = new Date(item.created_at);
+        return itemDate >= weekStart && itemDate <= weekEnd;
+      });
+      
+      const weekEmissions = weekItems.reduce((sum, item) => sum + (item.carbon_footprint || 0), 0);
+      
+      weeklyData.push({
+        day: `Week ${week}`,
+        emissions: Math.round(weekEmissions * 100) / 100,
+        scans: weekItems.length
+      });
+    }
+    
+    return weeklyData;
   }
 
   const now = new Date();
