@@ -19,6 +19,8 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
   const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
   const [productData, setProductData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastScanTime, setLastScanTime] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,7 +42,7 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
     if (stream && videoRef.current && scanning) {
       scanIntervalRef.current = setInterval(() => {
         scanForBarcode();
-      }, 500);
+      }, 1000); // Reduced frequency for better performance
     } else {
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
@@ -58,24 +60,65 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
   const startCamera = async () => {
     try {
       setError(null);
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+      setIsLoading(true);
+      
+      // Try multiple camera configurations with fallbacks
+      const cameraConfigs = [
+        { 
           facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
+        },
+        { 
+          facingMode: 'environment',
+          width: { ideal: 720 },
+          height: { ideal: 480 }
+        },
+        { 
+          facingMode: 'environment',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        },
+        { 
+          facingMode: 'environment' // Basic fallback
+        },
+        { 
+          // Last resort - use any available camera
+          width: { ideal: 640 },
+          height: { ideal: 480 }
         }
-      });
+      ];
+
+      let mediaStream: MediaStream | null = null;
+      
+      for (const config of cameraConfigs) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: config
+          });
+          break; // Success, exit loop
+        } catch (configError) {
+          console.log(`Camera config failed, trying next:`, configError);
+          continue; // Try next configuration
+        }
+      }
+
+      if (!mediaStream) {
+        throw new Error('No camera configuration worked');
+      }
       
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.onloadedmetadata = () => {
           setScanning(true);
+          setIsLoading(false);
         };
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
-      setError('Unable to access camera. Please check permissions.');
+      setError('Unable to access camera. Please check permissions and ensure your device has a camera.');
+      setIsLoading(false);
     }
   };
 
@@ -92,7 +135,12 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
   };
 
   const scanForBarcode = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !scanning) return;
+
+    // Debounce scanning to prevent multiple rapid scans
+    const now = Date.now();
+    if (now - lastScanTime < 800) return; // Minimum 800ms between scans
+    setLastScanTime(now);
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -100,12 +148,15 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
 
     if (!context || video.videoWidth === 0) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Optimize canvas size for better performance
+    const scale = Math.min(800 / video.videoWidth, 600 / video.videoHeight);
+    canvas.width = video.videoWidth * scale;
+    canvas.height = video.videoHeight * scale;
+    
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     // Convert canvas to image data for Quagga
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    const imageData = canvas.toDataURL('image/jpeg', 0.7);
     
     try {
       await new Promise<void>((resolve, reject) => {
@@ -113,25 +164,24 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
           src: imageData,
           numOfWorkers: 0,
           inputStream: {
-            size: 800
+            size: Math.min(canvas.width, canvas.height)
           },
           locator: {
-            patchSize: "medium",
-            halfSample: true
+            patchSize: "small", // Better for mobile performance
+            halfSample: false // Better accuracy for small barcodes
           },
           decoder: {
             readers: [
-              "code_128_reader",
-              "ean_reader", 
-              "ean_8_reader",
-              "code_39_reader",
-              "code_39_vin_reader",
-              "codabar_reader",
-              "upc_reader",
-              "upc_e_reader",
-              "i2of5_reader"
+              "ean_reader",      // EAN-13 (most common)
+              "ean_8_reader",    // EAN-8
+              "upc_reader",      // UPC-A
+              "upc_e_reader",    // UPC-E
+              "code_128_reader", // Code 128
+              "code_39_reader"   // Code 39
             ]
-          }
+          },
+          locate: true,
+          multiple: false
         }, (result) => {
           if (result && result.codeResult) {
             const barcode = result.codeResult.code;
@@ -139,17 +189,29 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
             
             console.log(`Detected ${format} barcode: ${barcode}`);
             
-            // Only process valid barcodes (minimum length and valid format)
-            if (barcode && barcode.length >= 8 && /^[0-9]+$/.test(barcode)) {
+            // Enhanced barcode validation - accept both numeric and alphanumeric
+            if (barcode && barcode.length >= 6 && /^[0-9A-Za-z]+$/.test(barcode)) {
               setDetectedBarcode(barcode);
               setScanning(false);
+              setIsLoading(true);
               
-              // Fetch product data
+              // Fetch product data with timeout
+              const fetchTimeout = setTimeout(() => {
+                setIsLoading(false);
+                setProductData(null);
+              }, 10000); // 10 second timeout
+              
               productClassificationService.searchProductByBarcode(barcode)
-                .then(setProductData)
+                .then((data) => {
+                  clearTimeout(fetchTimeout);
+                  setProductData(data);
+                  setIsLoading(false);
+                })
                 .catch((error) => {
+                  clearTimeout(fetchTimeout);
                   console.error('Error fetching product data:', error);
                   setProductData(null);
+                  setIsLoading(false);
                 });
             }
           }
@@ -187,21 +249,21 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
           </Button>
         </div>
 
-        {error ? (
-          <div className="text-center space-y-4">
-            <div className="text-destructive text-sm">{error}</div>
-            <Button onClick={startCamera}>
-              <Camera className="mr-2 h-4 w-4" />
-              Try Again
-            </Button>
-          </div>
-        ) : (
+          {error ? (
+            <div className="text-center space-y-4">
+              <div className="text-destructive text-sm">{error}</div>
+              <Button onClick={startCamera} disabled={isLoading}>
+                <Camera className="mr-2 h-4 w-4" />
+                {isLoading ? 'Starting...' : 'Try Again'}
+              </Button>
+            </div>
+          ) : (
           <>
             {/* Scanner Status */}
             <div className="flex items-center justify-center gap-2 py-2">
               <Badge variant={scanning ? "default" : detectedBarcode ? "outline" : "secondary"} 
-                     className={scanning ? "bg-eco-primary" : ""}>
-                {scanning ? "Scanning..." : detectedBarcode ? "Barcode Detected" : "Ready"}
+                     className={scanning ? "bg-eco-primary animate-pulse" : ""}>
+                {isLoading ? "Loading..." : scanning ? "Scanning..." : detectedBarcode ? "Barcode Detected" : "Ready"}
               </Badge>
             </div>
 
@@ -252,17 +314,27 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
                       <Badge variant="outline">{detectedBarcode}</Badge>
                     </div>
                     
-                    {productData ? (
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin h-4 w-4 border-2 border-eco-primary border-t-transparent rounded-full"></div>
+                        <p className="text-sm text-muted-foreground">
+                          Fetching product information...
+                        </p>
+                      </div>
+                    ) : productData ? (
                       <div className="space-y-1">
                         <p className="font-medium">{productData.name}</p>
                         <p className="text-sm text-muted-foreground">{productData.description}</p>
                         {productData.category && (
                           <Badge variant="secondary">{productData.category}</Badge>
                         )}
+                        {productData.brand && (
+                          <p className="text-xs text-muted-foreground">by {productData.brand}</p>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Fetching product information...
+                        Product not found in database. You can still use this barcode.
                       </p>
                     )}
                   </div>
@@ -273,7 +345,7 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
             <canvas ref={canvasRef} className="hidden" />
 
             {/* Manual Barcode Input */}
-            {!detectedBarcode && !scanning && (
+            {!detectedBarcode && !scanning && !isLoading && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground text-center">
                   Or enter a barcode manually:
@@ -281,20 +353,52 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Enter product barcode"
-                    className="flex-1 px-3 py-2 border rounded-md text-sm"
+                    placeholder="Enter product barcode (UPC/EAN)"
+                    className="flex-1 px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-eco-primary focus:border-eco-primary"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const barcode = (e.target as HTMLInputElement).value.trim();
-                        if (barcode) {
+                        if (barcode && barcode.length >= 6) {
                           setDetectedBarcode(barcode);
+                          setIsLoading(true);
                           productClassificationService.searchProductByBarcode(barcode)
-                            .then(setProductData)
-                            .catch(console.error);
+                            .then((data) => {
+                              setProductData(data);
+                              setIsLoading(false);
+                            })
+                            .catch((error) => {
+                              console.error('Error fetching product data:', error);
+                              setProductData(null);
+                              setIsLoading(false);
+                            });
                         }
                       }
                     }}
                   />
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      const input = document.querySelector('input[placeholder*="barcode"]') as HTMLInputElement;
+                      if (input && input.value.trim().length >= 6) {
+                        const barcode = input.value.trim();
+                        setDetectedBarcode(barcode);
+                        setIsLoading(true);
+                        productClassificationService.searchProductByBarcode(barcode)
+                          .then((data) => {
+                            setProductData(data);
+                            setIsLoading(false);
+                          })
+                          .catch((error) => {
+                            console.error('Error fetching product data:', error);
+                            setProductData(null);
+                            setIsLoading(false);
+                          });
+                      }
+                    }}
+                  >
+                    Search
+                  </Button>
                 </div>
               </div>
             )}
@@ -303,11 +407,15 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
             <div className="flex gap-3">
               {detectedBarcode ? (
                 <>
-                  <Button onClick={handleBarcodeConfirm} className="flex-1 bg-gradient-eco">
+                  <Button 
+                    onClick={handleBarcodeConfirm} 
+                    className="flex-1 bg-gradient-eco"
+                    disabled={isLoading}
+                  >
                     <Check className="mr-2 h-4 w-4" />
                     Use This Product
                   </Button>
-                  <Button variant="outline" onClick={handleRetry}>
+                  <Button variant="outline" onClick={handleRetry} disabled={isLoading}>
                     Scan Again
                   </Button>
                 </>
@@ -316,8 +424,9 @@ export function BarcodeScanner({ onBarcodeDetected, onCancel, isActive }: Barcod
                   variant="outline" 
                   onClick={scanning ? () => setScanning(false) : () => setScanning(true)}
                   className="flex-1"
+                  disabled={isLoading}
                 >
-                  {scanning ? 'Stop Scanning' : 'Start Scanning'}
+                  {isLoading ? 'Loading...' : scanning ? 'Stop Scanning' : 'Start Scanning'}
                 </Button>
               )}
             </div>
