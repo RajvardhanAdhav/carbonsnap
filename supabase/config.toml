@@ -20,6 +20,8 @@ port = 54324
 smtp_port = 54325
 pop3_port = 54326
 
+[functions.ai-carbon-recommendations]
+verify_jwt = false
 [functions.ai-receipt-parser]
 verify_jwt = false
 [functions.get-dashboard-data]

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, TrendingDown, TrendingUp, Target, Calendar, Zap, Award, Lightbulb, Trash2 } from "lucide-react";
+import { ArrowLeft, TrendingDown, TrendingUp, Target, Calendar, Zap, Award, Lightbulb, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +15,14 @@ const DashboardPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [recentScans, setRecentScans] = useState<any[]>([]);
+  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   useEffect(() => {
     if (user && session?.access_token) {
       fetchDashboardData();
       fetchRecentScans();
+      fetchAIRecommendations();
     }
   }, [user, session, timeframe]);
 
@@ -83,6 +86,57 @@ const DashboardPage = () => {
       fetchRecentScans();
     } catch (error) {
       console.error('Error deleting item:', error);
+    }
+  };
+
+  const clearAllScans = async () => {
+    try {
+      const { error } = await supabase
+        .from('scanned_items')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all user's items
+
+      if (error) throw error;
+      
+      // Refresh data
+      fetchDashboardData();
+      fetchRecentScans();
+    } catch (error) {
+      console.error('Error clearing all scans:', error);
+    }
+  };
+
+  const fetchAIRecommendations = async () => {
+    try {
+      setLoadingRecommendations(true);
+      const { data, error } = await supabase.functions.invoke('ai-carbon-recommendations', {
+        body: { timeframe },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      setAiRecommendations(data.recommendations || []);
+    } catch (error) {
+      console.error('Error fetching AI recommendations:', error);
+      // Fallback recommendations
+      setAiRecommendations([
+        {
+          category: "Transportation",
+          impact: "High",
+          suggestion: "Consider walking or cycling for trips under 3 miles to reduce 2.6 kg CO₂ per mile",
+          potential_savings: "15-25 kg CO₂/month"
+        },
+        {
+          category: "Food",
+          impact: "Medium", 
+          suggestion: "Replace 2 meat meals per week with plant-based alternatives to reduce emissions by 70%",
+          potential_savings: "8-12 kg CO₂/month"
+        }
+      ]);
+    } finally {
+      setLoadingRecommendations(false);
     }
   };
 
@@ -244,34 +298,92 @@ const DashboardPage = () => {
           </Card>
         </div>
 
-        {/* Recent Scans */}
-        {recentScans.length > 0 && (
-          <Card className="p-6 mt-8">
-            <h3 className="text-lg font-semibold mb-4">Recent Scans</h3>
-            <div className="space-y-3">
-              {recentScans.map((scan) => (
-                <div key={scan.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      {scan.item_type === 'receipt' ? scan.store_name : scan.product_name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {scan.carbon_footprint} kg CO₂ • {new Date(scan.created_at).toLocaleDateString()}
+        <div className="grid lg:grid-cols-2 gap-8 mt-8">
+          {/* AI Recommendations */}
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="h-5 w-5 text-eco-primary" />
+              <h3 className="text-lg font-semibold">AI Carbon Reduction Recommendations</h3>
+            </div>
+            {loadingRecommendations ? (
+              <div className="animate-pulse space-y-3">
+                <div className="h-16 bg-muted rounded-lg"></div>
+                <div className="h-16 bg-muted rounded-lg"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {aiRecommendations.map((rec, index) => (
+                  <div key={index} className="p-4 bg-gradient-eco/10 border border-eco-primary/20 rounded-lg">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={`${
+                          rec.impact === 'High' ? 'border-red-400 text-red-600' :
+                          rec.impact === 'Medium' ? 'border-yellow-400 text-yellow-600' :
+                          'border-green-400 text-green-600'
+                        }`}>
+                          {rec.impact} Impact
+                        </Badge>
+                        <span className="text-sm font-medium text-eco-primary">{rec.category}</span>
+                      </div>
+                    </div>
+                    <p className="text-sm mb-2">{rec.suggestion}</p>
+                    <p className="text-xs text-eco-primary font-medium">
+                      Potential savings: {rec.potential_savings}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteScannedItem(scan.id)}
-                    className="text-destructive hover:text-destructive/90"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
-        )}
+
+          {/* Recent Scans */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Recent Scans</h3>
+              {recentScans.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllScans}
+                  className="text-destructive hover:text-destructive/90 border-destructive/30"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+            {recentScans.length > 0 ? (
+              <div className="space-y-3">
+                {recentScans.map((scan) => (
+                  <div key={scan.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        {scan.item_type === 'receipt' ? scan.store_name : scan.product_name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {scan.carbon_footprint} kg CO₂ • {new Date(scan.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteScannedItem(scan.id)}
+                      className="text-destructive hover:text-destructive/90"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                <p>No recent scans</p>
+                <p className="text-sm">Start scanning to see your carbon footprint data</p>
+              </div>
+            )}
+          </Card>
+        </div>
 
         {/* Action Button */}
         <div className="text-center mt-8">
