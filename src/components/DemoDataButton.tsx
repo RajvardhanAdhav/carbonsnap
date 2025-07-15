@@ -122,7 +122,10 @@ export function DemoDataButton({ onDataAdded }: DemoDataButtonProps) {
   };
 
   const addDemoData = async () => {
+    console.log('Demo data button clicked', { user: !!user, session: !!session });
+    
     if (!user || !session?.access_token) {
+      console.log('Authentication check failed', { user, session });
       toast({
         title: "Authentication Required",
         description: "Please sign in to add demo data.",
