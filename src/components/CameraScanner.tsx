@@ -36,14 +36,21 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
   }, []);
 
   const cleanup = () => {
+    console.log('🧹 Cleaning up camera resources...');
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        console.log('🔌 Stopping track:', track.kind, track.readyState);
+        track.stop();
+      });
+      setStream(null);
     }
     if (autoTimerRef.current) {
       clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
     }
     if (detectionIntervalRef.current) {
       clearInterval(detectionIntervalRef.current);
+      detectionIntervalRef.current = null;
     }
   };
 
@@ -85,7 +92,15 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
 
   const startCamera = async () => {
     try {
+      console.log('📹 Starting camera...');
       setCameraError(null);
+      
+      // Clean up any existing stream first
+      if (stream) {
+        console.log('🔄 Cleaning up existing stream...');
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'environment',
@@ -94,13 +109,30 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
         }
       });
       
+      console.log('✅ Camera access granted, setting up stream...');
       setStream(mediaStream);
+      
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        console.log('📺 Video element connected to stream');
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      setCameraError('Unable to access camera. Please check permissions or upload an image instead.');
+      console.error('❌ Error accessing camera:', error);
+      let errorMessage = 'Unable to access camera. ';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Camera permission denied. Please allow camera access and try again.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'No camera found on this device.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += 'Camera is already in use by another application.';
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage += 'Camera does not support the requested resolution.';
+      } else {
+        errorMessage += 'Please check permissions or upload an image instead.';
+      }
+      
+      setCameraError(errorMessage);
     }
   };
 
@@ -221,13 +253,23 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
         {cameraError ? (
           <div className="text-center space-y-4">
             <div className="text-destructive text-sm">{cameraError}</div>
-            <Button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Image Instead
-            </Button>
+            <div className="space-y-2">
+              <Button 
+                onClick={startCamera}
+                variant="outline"
+                className="w-full"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Try Camera Again
+              </Button>
+              <Button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Image Instead
+              </Button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
