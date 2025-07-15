@@ -549,12 +549,8 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { imageData, scanMethod = 'camera' } = await req.json();
+    const { imageData, scanMethod = 'camera', manualData } = await req.json();
     
-    if (!imageData) {
-      throw new Error('Image data is required');
-    }
-
     // Get user from auth header
     const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
@@ -565,8 +561,50 @@ Deno.serve(async (req) => {
 
     console.log('Processing receipt for user:', user.id);
 
-    // Process the receipt image
-    const processedReceipt = await processReceiptImage(imageData);
+    let processedReceipt: ProcessedReceipt;
+
+    // Handle manual input case
+    if (scanMethod === 'manual' && manualData) {
+      console.log('Processing manual receipt data:', manualData);
+      
+      // Process manual data directly
+      const items: ReceiptItem[] = manualData.items?.map((item: any) => {
+        const result = calculateItemEmissions(item.name || item.productName, item.quantity || 1);
+        return {
+          name: item.name || item.productName,
+          quantity: (item.quantity || 1).toString(),
+          carbon: result.emissions_kg,
+          category: result.emissions_kg > 8 ? 'high' : result.emissions_kg > 3 ? 'medium' : 'low',
+          price: item.price || 0,
+          breakdown: result.breakdown,
+          suggestions: result.suggestions,
+          confidence: result.confidence
+        };
+      }) || [];
+
+      const totalCarbon = items.reduce((sum, item) => sum + item.carbon, 0);
+      const totalPrice = manualData.total || items.reduce((sum, item) => sum + (item.price || 0), 0);
+
+      processedReceipt = {
+        store: manualData.store || "Manual Entry",
+        date: manualData.date || new Date().toISOString().split('T')[0],
+        items,
+        totalCarbon: Math.round(totalCarbon * 100) / 100,
+        total: Math.round(totalPrice * 100) / 100,
+        location: "Manual Input",
+        equivalents: generateEquivalents(totalCarbon),
+        summary: {
+          highest_impact_category: items.length > 0 ? "Manual Items" : "None",
+          reduction_potential_kg: Math.round(totalCarbon * 0.3 * 100) / 100,
+          improvement_score: 85
+        }
+      };
+    } else if (imageData && imageData !== 'manual-input') {
+      // Process image data
+      processedReceipt = await processReceiptImage(imageData);
+    } else {
+      throw new Error('No valid input provided');
+    }
 
     // Store the main receipt record
     const { data: scannedItem, error: insertError } = await supabase
@@ -580,7 +618,10 @@ Deno.serve(async (req) => {
         carbon_footprint: processedReceipt.totalCarbon,
         carbon_category: processedReceipt.totalCarbon > 20 ? 'high' : processedReceipt.totalCarbon > 10 ? 'medium' : 'low',
         scan_method: scanMethod,
-        details: { itemCount: processedReceipt.items.length }
+        details: { 
+          itemCount: processedReceipt.items.length,
+          source: scanMethod === 'manual' ? 'Manual Input' : 'AI OCR'
+        }
       })
       .select()
       .single();
