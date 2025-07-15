@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, TrendingDown, TrendingUp, Target, Calendar, Zap, Award, Lightbulb, Trash2, X } from "lucide-react";
+import { ArrowLeft, TrendingDown, TrendingUp, Target, Calendar, Zap, Award, Lightbulb, Trash2, X, Info, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -306,6 +306,67 @@ const DashboardPage = () => {
         {/* Enhanced Dashboard */}
         <div className="animate-fade-in" style={{animationDelay: '0.5s'}}>
           <AdvancedDashboard timeframe={timeframe} />
+        </div>
+
+        {/* About Our Mission */}
+        <div className="mt-12 animate-fade-in" style={{animationDelay: '0.7s'}}>
+          <Card className="p-8 hover-scale transition-all duration-300 hover:shadow-lg bg-gradient-to-br from-eco-light/30 to-background border border-eco-primary/20">
+            <div className="text-center max-w-4xl mx-auto">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Info className="h-6 w-6 text-eco-primary animate-pulse" />
+                <h2 className="text-2xl font-bold">About Carbon Snap</h2>
+              </div>
+              
+              <p className="text-lg text-muted-foreground mb-6 leading-relaxed">
+                Our mission is to democratize carbon footprint awareness by making environmental impact tracking 
+                accessible, accurate, and actionable for everyone. Through cutting-edge AI technology and intuitive 
+                design, we empower individuals to make informed decisions that contribute to a more sustainable future.
+              </p>
+              
+              <div className="grid md:grid-cols-3 gap-6 mb-6">
+                <div className="p-4 rounded-lg bg-background/50 hover-scale transition-all duration-300">
+                  <Zap className="h-8 w-8 text-eco-primary mx-auto mb-2" />
+                  <h3 className="font-semibold mb-2">AI-Powered Analysis</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Advanced machine learning algorithms provide precise carbon footprint calculations
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-background/50 hover-scale transition-all duration-300">
+                  <Target className="h-8 w-8 text-eco-primary mx-auto mb-2" />
+                  <h3 className="font-semibold mb-2">Actionable Insights</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Personalized recommendations to reduce your environmental impact effectively
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-background/50 hover-scale transition-all duration-300">
+                  <Award className="h-8 w-8 text-eco-primary mx-auto mb-2" />
+                  <h3 className="font-semibold mb-2">Community Impact</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Join thousands of users making a collective difference for our planet
+                  </p>
+                </div>
+              </div>
+              
+              <div className="p-4 rounded-lg bg-eco-primary/10 border border-eco-primary/30 mb-4">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <ExternalLink className="h-4 w-4 text-eco-primary" />
+                  <span className="font-medium text-eco-primary">Born from Innovation</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Carbon Snap began as a winning project at a DevPost hackathon, where our team recognized 
+                  the urgent need for accessible environmental impact tracking. What started as a weekend 
+                  prototype has evolved into a comprehensive platform serving environmentally conscious 
+                  consumers worldwide.
+                </p>
+              </div>
+              
+              <p className="text-sm text-muted-foreground italic">
+                "Every scan brings us one step closer to a carbon-neutral future."
+              </p>
+            </div>
+          </Card>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
