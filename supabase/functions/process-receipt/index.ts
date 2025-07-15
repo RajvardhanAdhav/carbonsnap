@@ -582,7 +582,12 @@ function extractFromText(text: string, keywords: string[]): string {
 }
 
 Deno.serve(async (req) => {
+  console.log('=== Process Receipt Function Started ===');
+  console.log('Request method:', req.method);
+  console.log('Request URL:', req.url);
+  
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
