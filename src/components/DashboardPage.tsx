@@ -197,21 +197,25 @@ const DashboardPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-eco-primary mx-auto mb-4"></div>
-          <p>Loading dashboard...</p>
+        <div className="text-center animate-fade-in">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-eco-primary/20 border-t-eco-primary mx-auto mb-4"></div>
+            <div className="animate-ping absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-eco-primary rounded-full opacity-75"></div>
+          </div>
+          <p className="text-lg font-medium animate-pulse">Loading your dashboard...</p>
+          <p className="text-sm text-muted-foreground mt-2">Analyzing your carbon footprint</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background animate-fade-in">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300">
         <div className="container mx-auto px-4 h-14 flex items-center gap-4">
           <Link to="/">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="hover-scale transition-all duration-200">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -219,17 +223,21 @@ const DashboardPage = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <div className="container mx-auto px-4 py-6 max-w-6xl">{/* Time Period Selector */}
         {/* Time Period Selector */}
-        <div className="flex justify-center mb-8">
-          <div className="flex rounded-lg bg-muted p-1">
+        <div className="flex justify-center mb-8 animate-scale-in">
+          <div className="flex rounded-lg bg-muted p-1 transition-all duration-300 hover:shadow-lg">
             {(["week", "month", "year"] as const).map((period) => (
               <Button
                 key={period}
                 variant={timeframe === period ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setTimeframe(period)}
-                className={timeframe === period ? "bg-eco-primary hover:bg-eco-primary/90" : ""}
+                className={`transition-all duration-300 transform hover:scale-105 ${
+                  timeframe === period 
+                    ? "bg-eco-primary hover:bg-eco-primary/90 shadow-md" 
+                    : "hover:bg-muted-foreground/10"
+                }`}
               >
                 {period.charAt(0).toUpperCase() + period.slice(1)}
               </Button>
@@ -239,56 +247,66 @@ const DashboardPage = () => {
 
         {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
+          <Card className="p-6 hover-scale transition-all duration-300 hover:shadow-lg animate-fade-in" style={{animationDelay: '0.1s'}}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Emissions</p>
-                <p className="text-2xl font-bold">{currentStats.total} kg</p>
+                <p className="text-2xl font-bold transition-all duration-500">{currentStats.total} kg</p>
                 <p className="text-xs text-muted-foreground">CO₂ equivalent</p>
               </div>
-              <div className={`flex items-center text-sm ${currentStats.change < 0 ? 'text-success' : 'text-destructive'}`}>
-                {currentStats.change < 0 ? <TrendingDown className="h-4 w-4 mr-1" /> : <TrendingUp className="h-4 w-4 mr-1" />}
-                {Math.abs(currentStats.change)}%
+              <div className={`flex items-center text-sm transition-all duration-300 ${
+                currentStats.change < 0 ? 'text-success' : 'text-destructive'
+              }`}>
+                {currentStats.change < 0 ? 
+                  <TrendingDown className="h-4 w-4 mr-1 animate-bounce" /> : 
+                  <TrendingUp className="h-4 w-4 mr-1 animate-bounce" />
+                }
+                <span className="font-medium">{Math.abs(currentStats.change)}%</span>
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 hover-scale transition-all duration-300 hover:shadow-lg animate-fade-in" style={{animationDelay: '0.2s'}}>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <p className="text-sm text-muted-foreground">Goal Progress</p>
-                <p className="text-sm text-eco-primary font-medium">{Math.round(progressPercentage)}%</p>
+                <p className="text-sm text-eco-primary font-medium transition-all duration-300">{Math.round(progressPercentage)}%</p>
               </div>
-              <Progress value={progressPercentage} className="h-2" />
+              <Progress 
+                value={progressPercentage} 
+                className="h-2 transition-all duration-1000 ease-out" 
+              />
               <p className="text-xs text-muted-foreground">
                 {currentStats.total} / {currentStats.goal} kg target
               </p>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 hover-scale transition-all duration-300 hover:shadow-lg animate-fade-in" style={{animationDelay: '0.3s'}}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Items Scanned</p>
-                <p className="text-2xl font-bold">{currentStats.scans}</p>
+                <p className="text-2xl font-bold transition-all duration-500">{currentStats.scans}</p>
               </div>
-              <Calendar className="h-8 w-8 text-eco-primary" />
+              <Calendar className="h-8 w-8 text-eco-primary transition-transform duration-300 hover:scale-110" />
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 hover-scale transition-all duration-300 hover:shadow-lg animate-fade-in" style={{animationDelay: '0.4s'}}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Carbon Saved</p>
-                <p className="text-2xl font-bold text-success">8.2 kg</p>
+                <p className="text-2xl font-bold text-success transition-all duration-500">8.2 kg</p>
               </div>
-              <Target className="h-8 w-8 text-success" />
+              <Target className="h-8 w-8 text-success transition-transform duration-300 hover:scale-110" />
             </div>
           </Card>
         </div>
 
         {/* Enhanced Dashboard */}
-        <AdvancedDashboard timeframe={timeframe} />
+        <div className="animate-fade-in" style={{animationDelay: '0.5s'}}>
+          <AdvancedDashboard timeframe={timeframe} />
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Achievements */}
@@ -332,22 +350,29 @@ const DashboardPage = () => {
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8 mt-8">
+        <div className="grid lg:grid-cols-2 gap-8 mt-8 animate-fade-in" style={{animationDelay: '0.6s'}}>
           {/* AI Recommendations */}
-          <Card className="p-6">
+          <Card className="p-6 hover-scale transition-all duration-300 hover:shadow-lg">
             <div className="flex items-center gap-2 mb-4">
-              <Zap className="h-5 w-5 text-eco-primary" />
+              <Zap className="h-5 w-5 text-eco-primary animate-pulse" />
               <h3 className="text-lg font-semibold">AI Carbon Reduction Recommendations</h3>
             </div>
             {loadingRecommendations ? (
-              <div className="animate-pulse space-y-3">
-                <div className="h-16 bg-muted rounded-lg"></div>
-                <div className="h-16 bg-muted rounded-lg"></div>
+              <div className="space-y-3">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-16 bg-gradient-to-r from-muted via-muted/50 to-muted rounded-lg animate-fade-in"></div>
+                  <div className="h-16 bg-gradient-to-r from-muted via-muted/50 to-muted rounded-lg animate-fade-in" style={{animationDelay: '0.2s'}}></div>
+                  <div className="h-16 bg-gradient-to-r from-muted via-muted/50 to-muted rounded-lg animate-fade-in" style={{animationDelay: '0.4s'}}></div>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
                 {aiRecommendations.map((rec, index) => (
-                  <div key={index} className="p-4 bg-gradient-eco/10 border border-eco-primary/20 rounded-lg">
+                  <div 
+                    key={index} 
+                    className="p-4 bg-gradient-eco/10 border border-eco-primary/20 rounded-lg hover-scale transition-all duration-300 hover:shadow-md animate-fade-in" 
+                    style={{animationDelay: `${index * 0.1}s`}}
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className={`${
@@ -371,7 +396,7 @@ const DashboardPage = () => {
           </Card>
 
           {/* Recent Scans */}
-          <Card className="p-6">
+          <Card className="p-6 hover-scale transition-all duration-300 hover:shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Recent Scans</h3>
               {recentScans.length > 0 && (
@@ -379,17 +404,21 @@ const DashboardPage = () => {
                   variant="outline"
                   size="sm"
                   onClick={clearAllScans}
-                  className="text-destructive hover:text-destructive/90 border-destructive/30"
+                  className="text-destructive hover:text-destructive/90 border-destructive/30 hover-scale transition-all duration-200"
                 >
-                  <X className="h-4 w-4 mr-1" />
+                  <X className="h-4 w-4 mr-1 transition-transform duration-200 hover:rotate-90" />
                   Clear All
                 </Button>
               )}
             </div>
             {recentScans.length > 0 ? (
               <div className="space-y-3">
-                {recentScans.map((scan) => (
-                  <div key={scan.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                {recentScans.map((scan, index) => (
+                  <div 
+                    key={scan.id} 
+                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover-scale transition-all duration-300 hover:bg-muted/70 animate-fade-in"
+                    style={{animationDelay: `${index * 0.1}s`}}
+                  >
                     <div className="flex-1">
                       <p className="font-medium">
                         {scan.item_type === 'receipt' ? scan.store_name : scan.product_name}
@@ -402,17 +431,17 @@ const DashboardPage = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteScannedItem(scan.id)}
-                      className="text-destructive hover:text-destructive/90"
+                      className="text-destructive hover:text-destructive/90 hover-scale transition-all duration-200"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 transition-transform duration-200 hover:scale-110" />
                     </Button>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                <p>No recent scans</p>
+              <div className="text-center py-8 text-muted-foreground animate-fade-in">
+                <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50 animate-pulse" />
+                <p className="font-medium">No recent scans</p>
                 <p className="text-sm">Start scanning to see your carbon footprint data</p>
               </div>
             )}
@@ -420,10 +449,13 @@ const DashboardPage = () => {
         </div>
 
         {/* Action Button */}
-        <div className="text-center mt-8">
+        <div className="text-center mt-8 animate-fade-in" style={{animationDelay: '0.8s'}}>
           <Link to="/scanner">
-            <Button size="lg" className="bg-gradient-eco hover:opacity-90 shadow-eco">
-              <Zap className="mr-2 h-5 w-5" />
+            <Button 
+              size="lg" 
+              className="bg-gradient-eco hover:opacity-90 shadow-eco hover-scale transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1"
+            >
+              <Zap className="mr-2 h-5 w-5 animate-pulse" />
               Scan More Items
             </Button>
           </Link>
