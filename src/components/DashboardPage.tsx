@@ -22,9 +22,17 @@ const DashboardPage = () => {
     if (user && session?.access_token) {
       fetchDashboardData();
       fetchRecentScans();
-      fetchAIRecommendations();
     }
   }, [user, session, timeframe]);
+
+  // Fetch AI recommendations when recent scans change
+  useEffect(() => {
+    if (recentScans.length > 0 && user && session?.access_token) {
+      fetchAIRecommendations();
+    } else {
+      setAiRecommendations([]);
+    }
+  }, [recentScans, user, session]);
 
   const fetchDashboardData = async () => {
     try {
@@ -81,6 +89,9 @@ const DashboardPage = () => {
 
       if (error) throw error;
       
+      // Remove the recommendation associated with this scan
+      setAiRecommendations(prev => prev.filter(rec => rec.scan_id !== itemId));
+      
       // Refresh data
       fetchDashboardData();
       fetchRecentScans();
@@ -98,6 +109,9 @@ const DashboardPage = () => {
 
       if (error) throw error;
       
+      // Clear all recommendations
+      setAiRecommendations([]);
+      
       // Refresh data
       fetchDashboardData();
       fetchRecentScans();
@@ -107,34 +121,54 @@ const DashboardPage = () => {
   };
 
   const fetchAIRecommendations = async () => {
+    if (recentScans.length === 0) {
+      setAiRecommendations([]);
+      return;
+    }
+
     try {
       setLoadingRecommendations(true);
       const { data, error } = await supabase.functions.invoke('ai-carbon-recommendations', {
-        body: { timeframe },
+        body: { 
+          timeframe,
+          recent_scans: recentScans.map(scan => ({
+            id: scan.id,
+            item_type: scan.item_type,
+            product_name: scan.product_name,
+            store_name: scan.store_name,
+            carbon_footprint: scan.carbon_footprint,
+            carbon_category: scan.carbon_category,
+            created_at: scan.created_at,
+            details: scan.details
+          }))
+        },
         headers: {
           Authorization: `Bearer ${session?.access_token}`,
         },
       });
 
       if (error) throw error;
-      setAiRecommendations(data.recommendations || []);
+      
+      // Ensure recommendations are tied to specific scans
+      const recommendations = (data.recommendations || []).map((rec: any, index: number) => ({
+        ...rec,
+        scan_id: recentScans[index % recentScans.length]?.id // Associate with a scan
+      }));
+      
+      setAiRecommendations(recommendations);
     } catch (error) {
       console.error('Error fetching AI recommendations:', error);
-      // Fallback recommendations
-      setAiRecommendations([
-        {
-          category: "Transportation",
-          impact: "High",
-          suggestion: "Consider walking or cycling for trips under 3 miles to reduce 2.6 kg CO₂ per mile",
-          potential_savings: "15-25 kg CO₂/month"
-        },
-        {
-          category: "Food",
-          impact: "Medium", 
-          suggestion: "Replace 2 meat meals per week with plant-based alternatives to reduce emissions by 70%",
-          potential_savings: "8-12 kg CO₂/month"
-        }
-      ]);
+      // Fallback recommendations tied to current scans
+      const fallbackRecs = recentScans.slice(0, 3).map((scan, index) => ({
+        scan_id: scan.id,
+        category: scan.carbon_category === 'high' ? "High Emission Item" : "Optimization",
+        impact: scan.carbon_footprint > 10 ? "High" : scan.carbon_footprint > 5 ? "Medium" : "Low",
+        suggestion: scan.carbon_footprint > 10 
+          ? `Consider alternatives to ${scan.product_name || scan.store_name} to reduce high emissions`
+          : `Look for eco-friendly alternatives to ${scan.product_name || scan.store_name}`,
+        potential_savings: `${Math.round(scan.carbon_footprint * 0.3)}-${Math.round(scan.carbon_footprint * 0.7)} kg CO₂/month`
+      }));
+      setAiRecommendations(fallbackRecs);
     } finally {
       setLoadingRecommendations(false);
     }

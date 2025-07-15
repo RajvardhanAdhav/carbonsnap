@@ -27,27 +27,43 @@ serve(async (req) => {
       throw new Error('Authentication failed');
     }
 
-    const { timeframe = 'month' } = await req.json();
+    const { timeframe = 'month', recent_scans = [] } = await req.json();
 
-    console.log('Generating AI recommendations for user:', user.id, 'timeframe:', timeframe);
+    console.log('Generating AI recommendations for user:', user.id, 'timeframe:', timeframe, 'recent scans:', recent_scans.length);
 
-    // Fetch user's recent scan data for analysis
-    const { data: scannedItems, error: scanError } = await supabase
-      .from('scanned_items')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    // Use the recent_scans data directly if provided, otherwise fetch from database
+    let scannedItems = recent_scans;
+    
+    if (!recent_scans || recent_scans.length === 0) {
+      console.log('No recent scans provided, fetching from database');
+      const { data: dbItems, error: scanError } = await supabase
+        .from('scanned_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-    if (scanError) throw scanError;
+      if (scanError) throw scanError;
+      scannedItems = dbItems || [];
+    }
 
     // Fetch user goals
     const { data: userGoals } = await supabase
       .from('user_goals')
       .select('*')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
+    // If no recent scans, return empty recommendations
+    if (!scannedItems || scannedItems.length === 0) {
+      console.log('No scanned items found, returning empty recommendations');
+      return new Response(JSON.stringify({ 
+        recommendations: [],
+        message: "No recent scans to analyze. Start scanning items to get personalized recommendations!"
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     // Prepare data for AI analysis
     const userProfile = {
       timeframe,
@@ -65,8 +81,10 @@ serve(async (req) => {
         monthly: userGoals?.monthly_goal || 60,
         yearly: userGoals?.yearly_goal || 700
       },
-      recent_items: scannedItems?.slice(0, 10).map(item => ({
+      recent_items: scannedItems?.map(item => ({
+        id: item.id,
         type: item.item_type,
+        name: item.product_name || item.store_name,
         emissions: item.carbon_footprint,
         category: item.carbon_category,
         date: item.created_at
@@ -82,24 +100,29 @@ serve(async (req) => {
     }
 
     const prompt = `
-As an expert carbon footprint analyst, analyze this user's data and provide highly personalized, actionable recommendations to reduce their carbon footprint.
+Analyze the user's ACTUAL scanned items and provide specific recommendations for their current shopping/consumption patterns.
 
 User Profile:
-- Timeframe: ${userProfile.timeframe}
-- Total items scanned: ${userProfile.total_items}
-- Total emissions: ${userProfile.total_emissions.toFixed(2)} kg CO₂
+- Current recent scans: ${userProfile.recent_items.length} items
+- Total emissions from recent scans: ${userProfile.total_emissions.toFixed(2)} kg CO₂
 - Average emissions per item: ${userProfile.average_daily_emissions.toFixed(2)} kg CO₂
 - Carbon categories breakdown: ${JSON.stringify(userProfile.categories)}
 - Goals: Weekly ${userProfile.goals.weekly}kg, Monthly ${userProfile.goals.monthly}kg, Yearly ${userProfile.goals.yearly}kg
-- Recent items: ${JSON.stringify(userProfile.recent_items)}
 
-Provide 4-6 highly specific, actionable recommendations in JSON format with this structure:
+SPECIFIC ITEMS TO ANALYZE:
+${userProfile.recent_items.map((item, index) => 
+  `${index + 1}. ${item.name} (${item.emissions}kg CO₂, ${item.category} category, scanned ${new Date(item.date).toLocaleDateString()})`
+).join('\n')}
+
+Provide ${Math.min(userProfile.recent_items.length, 4)} specific recommendations based on these EXACT items in JSON format:
 {
   "recommendations": [
     {
+      "scan_id": "use the actual item.id from the scanned items",
+      "item_name": "specific item name from the scan",
       "category": "Transportation/Food/Energy/Shopping/etc",
       "impact": "High/Medium/Low",
-      "suggestion": "Specific, actionable advice based on their actual data",
+      "suggestion": "Specific advice for THIS exact item the user scanned",
       "potential_savings": "X-Y kg CO₂/month",
       "difficulty": "Easy/Medium/Hard",
       "timeline": "Immediate/1 week/1 month"
@@ -108,11 +131,11 @@ Provide 4-6 highly specific, actionable recommendations in JSON format with this
 }
 
 Focus on:
-1. Their biggest emission sources based on actual data
-2. Quick wins vs long-term changes
-3. Specific numbers and realistic savings
-4. Personal relevance to their scanning patterns
-5. Progressive difficulty levels
+1. Each specific item they scanned and alternatives for that exact item
+2. Realistic substitutions based on their shopping patterns
+3. Specific numbers and realistic savings per item
+4. Easy first steps vs longer-term changes
+5. Make sure each recommendation has the corresponding scan_id
 `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -126,7 +149,7 @@ Focus on:
         messages: [
           {
             role: 'system',
-            content: 'You are a world-class carbon footprint reduction expert. Provide precise, data-driven, actionable recommendations based on user behavior patterns.'
+            content: 'You are a world-class carbon footprint reduction expert. Provide precise, item-specific recommendations based on the user\'s actual scanned items. Each recommendation must include the scan_id of the specific item it relates to.'
           },
           {
             role: 'user',
@@ -149,7 +172,10 @@ Focus on:
     try {
       const content = aiResponse.choices[0].message.content;
       const parsed = JSON.parse(content);
-      recommendations = parsed.recommendations;
+      recommendations = parsed.recommendations.map((rec: any) => ({
+        ...rec,
+        scan_id: rec.scan_id || userProfile.recent_items[0]?.id // Ensure scan_id is present
+      }));
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
       return generateFallbackRecommendations(userProfile);
