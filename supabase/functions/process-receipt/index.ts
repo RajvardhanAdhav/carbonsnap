@@ -261,13 +261,24 @@ async function processReceiptImage(imageData: string): Promise<ProcessedReceipt>
       }
     }
 
-    // Method 2: Use OpenAI GPT-4.1 with enhanced prompting
+    // Method 2: Use OpenAI GPT-4o with enhanced prompting
     console.log('Attempting advanced OpenAI analysis...');
+    
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log('OpenAI API Key status:', {
+      exists: !!openaiApiKey,
+      length: openaiApiKey?.length || 0,
+      prefix: openaiApiKey ? openaiApiKey.substring(0, 12) + '...' : 'none'
+    });
+    
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not found in environment variables');
+    }
     
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
