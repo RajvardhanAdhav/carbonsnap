@@ -147,62 +147,6 @@ export function AdvancedDashboard({ timeframe }: AdvancedDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-eco opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
-          <div className="flex items-center justify-between relative">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Emissions</p>
-              <p className="text-2xl font-bold">{dashboardData.stats.total} kg</p>
-              <p className="text-xs text-muted-foreground">CO₂ equivalent</p>
-            </div>
-            <div className={`flex items-center text-sm ${dashboardData.stats.change < 0 ? 'text-success' : 'text-destructive'}`}>
-              {dashboardData.stats.change < 0 ? <TrendingDown className="h-4 w-4 mr-1" /> : <TrendingUp className="h-4 w-4 mr-1" />}
-              {Math.abs(dashboardData.stats.change)}%
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-eco-primary to-eco-secondary opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
-          <div className="space-y-2 relative">
-            <div className="flex justify-between">
-              <p className="text-sm text-muted-foreground">Goal Progress</p>
-              <p className="text-sm text-eco-primary font-medium">{Math.round(progressPercentage)}%</p>
-            </div>
-            <Progress value={progressPercentage} className="h-3" />
-            <p className="text-xs text-muted-foreground">
-              {dashboardData.stats.total} / {dashboardData.stats.goal} kg target
-            </p>
-          </div>
-        </Card>
-
-        <Card className="p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-success opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
-          <div className="flex items-center justify-between relative">
-            <div>
-              <p className="text-sm text-muted-foreground">Carbon Saved</p>
-              <p className="text-2xl font-bold text-success">{dashboardData.stats.carbonSaved} kg</p>
-              <p className="text-xs text-muted-foreground">vs. last {timeframe}</p>
-            </div>
-            <Target className="h-8 w-8 text-success" />
-          </div>
-        </Card>
-
-        <Card className="p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-primary opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
-          <div className="flex items-center justify-between relative">
-            <div>
-              <p className="text-sm text-muted-foreground">Items Scanned</p>
-              <p className="text-2xl font-bold">{dashboardData.stats.scans}</p>
-              <p className="text-xs text-muted-foreground">this {timeframe}</p>
-            </div>
-            <Zap className="h-8 w-8 text-primary" />
-          </div>
-        </Card>
-      </div>
-
       {/* Export & Share */}
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={exportData}>
