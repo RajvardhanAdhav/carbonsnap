@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Camera, Upload, Scan, Receipt, Package, ArrowLeft, CheckCircle, Edit, Loader2, BarChart3 } from "lucide-react";
+import { Camera, Upload, Scan, Receipt, ArrowLeft, CheckCircle, Edit, Loader2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import ManualInputModal from "./ManualInputModal";
 import { BarcodeScanner } from "./enhanced/BarcodeScanner";
 import { ReductionTipsEngine } from "./enhanced/ReductionTipsEngine";
 
-type ScanMode = "receipt" | "item" | "barcode";
+type ScanMode = "receipt" | "barcode";
 
 const ScannerPage = () => {
   const { user, session } = useAuth();
@@ -41,24 +41,6 @@ const ScannerPage = () => {
 
         if (error) throw error;
         setScanResult({ type: 'receipt', ...data.data });
-      } else {
-        // For single items, we'll use a simplified approach
-        // In a real app, you'd use OCR/vision APIs to extract product info
-        const { data, error } = await supabase.functions.invoke('scan-item', {
-          body: { 
-            productName: 'Scanned Product', // This would come from OCR
-            brand: 'Unknown',
-            imageData,
-            scanMethod,
-            category: 'general'
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        if (error) throw error;
-        setScanResult({ type: 'item', ...data.data });
       }
     } catch (error) {
       console.error('Error processing image:', error);
@@ -77,38 +59,20 @@ const ScannerPage = () => {
     setIsScanning(true);
     
     try {
-      if (data.type === 'receipt') {
-        // Process manual receipt data
-        const { data: result, error } = await supabase.functions.invoke('process-receipt', {
-          body: { 
-            imageData: 'manual-input', // Placeholder for manual input
-            scanMethod: 'manual',
-            manualData: data
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
+      // Only process manual receipt data now
+      const { data: result, error } = await supabase.functions.invoke('process-receipt', {
+        body: { 
+          imageData: 'manual-input',
+          scanMethod: 'manual',
+          manualData: data
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-        if (error) throw error;
-        setScanResult({ type: 'receipt', ...result.data });
-      } else {
-        // Process single item
-        const { data: result, error } = await supabase.functions.invoke('scan-item', {
-          body: { 
-            productName: data.productName,
-            brand: data.brand,
-            category: data.category,
-            scanMethod: 'manual'
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        if (error) throw error;
-        setScanResult({ type: 'item', ...result.data });
-      }
+      if (error) throw error;
+      setScanResult({ type: 'receipt', ...result.data });
     } catch (error) {
       console.error('Error processing manual input:', error);
       alert('Failed to process input. Please try again.');
@@ -127,13 +91,10 @@ const ScannerPage = () => {
     setShowBarcodeScanner(false);
     
     try {
-      const { data, error } = await supabase.functions.invoke('scan-item', {
+      const { data, error } = await supabase.functions.invoke('scan-barcode', {
         body: { 
-          productName: productData?.name || 'Scanned Product',
-          brand: productData?.brand || 'Unknown',
           barcode,
-          scanMethod: 'barcode',
-          category: productData?.category || 'general'
+          scanMethod: 'barcode'
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -194,7 +155,7 @@ const ScannerPage = () => {
             {/* Scan Mode Selection */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-center mb-6">What would you like to scan?</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-lg mx-auto">
                 <Card 
                   className={`p-6 text-center cursor-pointer transition-all border-2 ${
                     scanMode === "receipt" 
@@ -205,20 +166,7 @@ const ScannerPage = () => {
                 >
                   <Receipt className="h-12 w-12 mx-auto mb-4 text-eco-primary" />
                   <h3 className="font-semibold mb-2">Receipt</h3>
-                  <p className="text-sm text-muted-foreground">Scan entire shopping receipt</p>
-                </Card>
-                
-                <Card 
-                  className={`p-6 text-center cursor-pointer transition-all border-2 ${
-                    scanMode === "item" 
-                      ? "border-eco-primary bg-eco-primary/5" 
-                      : "border-border hover:border-eco-primary/50"
-                  }`}
-                  onClick={() => setScanMode("item")}
-                >
-                  <Package className="h-12 w-12 mx-auto mb-4 text-eco-primary" />
-                  <h3 className="font-semibold mb-2">Single Item</h3>
-                  <p className="text-sm text-muted-foreground">Scan individual product</p>
+                  <p className="text-sm text-muted-foreground">Scan entire shopping receipt with AI</p>
                 </Card>
 
                 <Card 
@@ -231,7 +179,7 @@ const ScannerPage = () => {
                 >
                   <Scan className="h-12 w-12 mx-auto mb-4 text-eco-primary" />
                   <h3 className="font-semibold mb-2">Barcode</h3>
-                  <p className="text-sm text-muted-foreground">Scan product barcode</p>
+                  <p className="text-sm text-muted-foreground">Scan barcode for product data</p>
                 </Card>
               </div>
             </div>
