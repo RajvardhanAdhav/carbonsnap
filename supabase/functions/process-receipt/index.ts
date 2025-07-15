@@ -195,66 +195,131 @@ function generateEquivalents(totalEmissions: number): string[] {
 }
 
 // Enhanced receipt processing with comprehensive LCA
-function processReceiptImage(imageData: string): ProcessedReceipt {
+async function processReceiptImage(imageData: string): Promise<ProcessedReceipt> {
   const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
   
-  // Note: This function is for development/testing purposes
-  // In production, this should use actual OCR processing
-  console.log('Processing receipt image - this is a placeholder implementation');
+  console.log('Processing receipt image with AI OCR...');
   
-  return {
-    store: "Receipt Processing",
-    date: new Date().toISOString().split('T')[0],
-    items: [],
-    total: 0,
-    carbon_footprint: 0,
-    confidence: 0.1,
-    note: "Real OCR processing not implemented. Please use barcode scanning or manual input."
-      category: result.emissions_kg > 8 ? 'high' : result.emissions_kg > 3 ? 'medium' : 'low',
-      price: item.price * quantity,
-      breakdown: result.breakdown,
-      suggestions: result.suggestions,
-      confidence: result.confidence
+  try {
+    // Use AI-powered OCR to extract receipt data
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert at reading receipts. Extract the store name, date, and ALL items with their prices from the receipt image. Return ONLY valid JSON in this format:
+{
+  "store": "Store Name",
+  "date": "YYYY-MM-DD",
+  "items": [
+    {"name": "Product Name", "price": 0.00, "quantity": 1}
+  ],
+  "total": 0.00
+}
+
+Be very accurate and include ALL items you can see on the receipt. If you can't read something clearly, make your best guess but include it.`
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Please extract all the information from this receipt:'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageData
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 2000
+      }),
     });
-  }
-  
-  const totalCarbon = selectedItems.reduce((sum, item) => sum + item.carbon, 0);
-  const totalPrice = selectedItems.reduce((sum, item) => sum + item.price, 0);
-  
-  // Calculate summary metrics
-  const categoryTotals: Record<string, number> = {};
-  selectedItems.forEach(item => {
-    const category = item.name.includes('Beef') ? 'Beef' : 
-                   item.name.includes('Fish') ? 'Fish' : 
-                   item.name.includes('Plant') ? 'Plant-Based' : 'Other';
-    categoryTotals[category] = (categoryTotals[category] || 0) + item.carbon;
-  });
-  
-  const highestImpactCategory = Object.entries(categoryTotals)
-    .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Unknown';
-  
-  const reductionPotential = selectedItems.reduce((sum, item) => {
-    if (item.name.includes('Beef') || item.name.includes('Lamb')) return sum + item.carbon * 0.8;
-    if (item.name.includes('Dairy') || item.name.includes('Pork')) return sum + item.carbon * 0.6;
-    return sum + item.carbon * 0.3;
-  }, 0);
-  
-  const avgConfidence = selectedItems.reduce((sum, item) => sum + (item.confidence || 0.7), 0) / selectedItems.length;
-  
-  return {
-    store: storeName,
-    date: new Date().toISOString().split('T')[0],
-    items: selectedItems,
-    totalCarbon: Math.round(totalCarbon * 100) / 100,
-    total: Math.round(totalPrice * 100) / 100,
-    location: "San Francisco, CA",
-    equivalents: generateEquivalents(totalCarbon),
-    summary: {
-      highest_impact_category: highestImpactCategory,
-      reduction_potential_kg: Math.round(reductionPotential * 100) / 100,
-      improvement_score: Math.round(avgConfidence * 100)
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
-  };
+
+    const aiResponse = await response.json();
+    const content = aiResponse.choices[0].message.content;
+    
+    // Parse the JSON response
+    let receiptData;
+    try {
+      receiptData = JSON.parse(content);
+    } catch (parseError) {
+      // Try to extract JSON from response if it's wrapped in markdown
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        receiptData = JSON.parse(jsonMatch[1]);
+      } else {
+        throw new Error('Failed to parse AI response as JSON');
+      }
+    }
+
+    console.log('AI OCR extracted data:', receiptData);
+
+    // Process each item through carbon calculation
+    const processedItems: ReceiptItem[] = receiptData.items.map((item: any) => {
+      const result = calculateItemEmissions(item.name, item.quantity || 1);
+      return {
+        name: item.name,
+        quantity: (item.quantity || 1).toString(),
+        carbon: result.emissions_kg,
+        category: result.emissions_kg > 8 ? 'high' : result.emissions_kg > 3 ? 'medium' : 'low',
+        price: item.price || 0,
+        breakdown: result.breakdown,
+        suggestions: result.suggestions,
+        confidence: result.confidence
+      };
+    });
+
+    const totalCarbon = processedItems.reduce((sum, item) => sum + item.carbon, 0);
+
+    return {
+      store: receiptData.store || "Unknown Store",
+      date: receiptData.date || new Date().toISOString().split('T')[0],
+      items: processedItems,
+      totalCarbon: Math.round(totalCarbon * 100) / 100,
+      total: receiptData.total || processedItems.reduce((sum, item) => sum + (item.price || 0), 0),
+      location: "Receipt Location",
+      equivalents: generateEquivalents(totalCarbon),
+      summary: {
+        highest_impact_category: processedItems.length > 0 ? 
+          processedItems.reduce((max, item) => item.carbon > max.carbon ? item : max).name : "None",
+        reduction_potential_kg: Math.round(totalCarbon * 0.3 * 100) / 100,
+        improvement_score: Math.round(processedItems.reduce((sum, item) => sum + (item.confidence || 0.7), 0) / processedItems.length * 100) || 70
+      }
+    };
+
+  } catch (error) {
+    console.error('AI OCR failed:', error);
+    
+    // Fallback to simple processing
+    return {
+      store: "Receipt Processing Failed",
+      date: new Date().toISOString().split('T')[0],
+      items: [],
+      totalCarbon: 0,
+      total: 0,
+      location: "Unknown",
+      equivalents: [],
+      summary: {
+        highest_impact_category: "None",
+        reduction_potential_kg: 0,
+        improvement_score: 0
+      }
+    };
+  }
 }
 
 Deno.serve(async (req) => {
@@ -285,7 +350,7 @@ Deno.serve(async (req) => {
     console.log('Processing receipt for user:', user.id);
 
     // Process the receipt image
-    const processedReceipt = processReceiptImage(imageData);
+    const processedReceipt = await processReceiptImage(imageData);
 
     // Store the main receipt record
     const { data: scannedItem, error: insertError } = await supabase
