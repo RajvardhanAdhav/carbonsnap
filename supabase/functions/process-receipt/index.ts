@@ -230,7 +230,7 @@ async function processReceiptImage(imageData: string): Promise<ProcessedReceipt>
   
   try {
     // Check OpenAI API key availability
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    const openaiApiKey = Deno.env.get('openai');
     console.log('🔑 OpenAI API Key check:', {
       exists: !!openaiApiKey,
       length: openaiApiKey?.length || 0,
