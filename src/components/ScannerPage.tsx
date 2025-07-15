@@ -44,7 +44,10 @@ const ScannerPage = () => {
         console.log('Process-receipt response:', { data, error });
         if (error) {
           console.error('Supabase function error:', error);
-          throw error;
+          throw new Error(error.message || 'Failed to process receipt');
+        }
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to process receipt');
         }
         setScanResult({ type: 'receipt', ...data.data });
       }
