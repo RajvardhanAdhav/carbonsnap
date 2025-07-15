@@ -198,10 +198,10 @@ function generateEquivalents(totalEmissions: number): string[] {
 async function processReceiptImage(imageData: string): Promise<ProcessedReceipt> {
   const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
   
-  console.log('Processing receipt image with AI OCR...');
+  console.log('Processing receipt image with advanced AI OCR...');
   
   try {
-    // Use AI-powered OCR to extract receipt data
+    // First attempt: Use latest GPT model with detailed prompting
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -209,104 +209,293 @@ async function processReceiptImage(imageData: string): Promise<ProcessedReceipt>
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
-            content: `You are an expert at reading receipts. Extract the store name, date, and ALL items with their prices from the receipt image. Return ONLY valid JSON in this format:
+            content: `You are an expert receipt parser used by major companies like Fetch for extracting purchase data. Your task is to accurately extract ALL items, prices, and store information from receipt images.
+
+INSTRUCTIONS:
+1. Extract store name from the top of the receipt
+2. Find the purchase date (look for date formats like MM/DD/YYYY, DD/MM/YYYY, etc.)
+3. Identify ALL purchased items with their prices
+4. Look for subtotal, tax, and total amounts
+5. Be very thorough - don't miss any items, even small ones
+6. If text is unclear, make your best educated guess based on context
+7. For quantities, look for patterns like "2x", "3 @", "QTY: 2", etc.
+
+IMPORTANT: Extract EVERY item you can see, even if partially obscured. Companies like Fetch need complete transaction data.
+
+Return your response in this EXACT JSON format:
 {
-  "store": "Store Name",
+  "store": "Store Name Here",
   "date": "YYYY-MM-DD",
   "items": [
     {"name": "Product Name", "price": 0.00, "quantity": 1}
   ],
-  "total": 0.00
+  "subtotal": 0.00,
+  "tax": 0.00,
+  "total": 0.00,
+  "confidence": 0.95
 }
 
-Be very accurate and include ALL items you can see on the receipt. If you can't read something clearly, make your best guess but include it.`
+If you cannot read certain parts clearly, still include your best guess and set confidence lower.`
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: 'Please extract all the information from this receipt:'
+                text: 'Please extract all purchase information from this receipt image. Be thorough and extract every item you can see:'
               },
               {
                 type: 'image_url',
                 image_url: {
-                  url: imageData
+                  url: imageData,
+                  detail: 'high'
                 }
               }
             ]
           }
         ],
-        max_tokens: 2000
+        max_tokens: 4000,
+        temperature: 0.1 // Low temperature for consistency
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      console.error(`OpenAI API error: ${response.status} - ${await response.text()}`);
+      throw new Error(`OpenAI API failed with status ${response.status}`);
     }
 
     const aiResponse = await response.json();
-    const content = aiResponse.choices[0].message.content;
+    console.log('OpenAI response received:', JSON.stringify(aiResponse, null, 2));
     
-    // Parse the JSON response
+    if (!aiResponse.choices || !aiResponse.choices[0]?.message?.content) {
+      throw new Error('Invalid OpenAI response structure');
+    }
+
+    const content = aiResponse.choices[0].message.content;
+    console.log('AI extracted content:', content);
+    
+    // Parse the JSON response with multiple fallback strategies
     let receiptData;
     try {
+      // Try direct JSON parse first
       receiptData = JSON.parse(content);
     } catch (parseError) {
-      // Try to extract JSON from response if it's wrapped in markdown
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+      console.log('Direct JSON parse failed, trying markdown extraction...');
+      
+      // Try to extract JSON from markdown code blocks
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (jsonMatch) {
-        receiptData = JSON.parse(jsonMatch[1]);
+        try {
+          receiptData = JSON.parse(jsonMatch[1]);
+        } catch (markdownError) {
+          console.error('Markdown JSON parse failed:', markdownError);
+          throw new Error('Failed to parse AI response as JSON');
+        }
       } else {
-        throw new Error('Failed to parse AI response as JSON');
+        // Try to find JSON-like structure without code blocks
+        const possibleJson = content.match(/\{[\s\S]*\}/);
+        if (possibleJson) {
+          try {
+            receiptData = JSON.parse(possibleJson[0]);
+          } catch (structureError) {
+            console.error('Structure JSON parse failed:', structureError);
+            throw new Error('No valid JSON structure found in AI response');
+          }
+        } else {
+          throw new Error('No JSON structure found in AI response');
+        }
       }
     }
 
-    console.log('AI OCR extracted data:', receiptData);
+    console.log('Successfully parsed receipt data:', JSON.stringify(receiptData, null, 2));
+
+    // Validate the parsed data
+    if (!receiptData || typeof receiptData !== 'object') {
+      throw new Error('Invalid receipt data structure');
+    }
+
+    // Ensure required fields exist with defaults
+    receiptData.store = receiptData.store || "Unknown Store";
+    receiptData.date = receiptData.date || new Date().toISOString().split('T')[0];
+    receiptData.items = Array.isArray(receiptData.items) ? receiptData.items : [];
+    receiptData.total = typeof receiptData.total === 'number' ? receiptData.total : 0;
+    receiptData.confidence = typeof receiptData.confidence === 'number' ? receiptData.confidence : 0.7;
 
     // Process each item through carbon calculation
     const processedItems: ReceiptItem[] = receiptData.items.map((item: any) => {
-      const result = calculateItemEmissions(item.name, item.quantity || 1);
+      const itemName = item.name || "Unknown Item";
+      const itemPrice = typeof item.price === 'number' ? item.price : 0;
+      const itemQuantity = typeof item.quantity === 'number' ? item.quantity : 1;
+      
+      const result = calculateItemEmissions(itemName, itemQuantity);
+      
       return {
-        name: item.name,
-        quantity: (item.quantity || 1).toString(),
+        name: itemName,
+        quantity: itemQuantity.toString(),
         carbon: result.emissions_kg,
         category: result.emissions_kg > 8 ? 'high' : result.emissions_kg > 3 ? 'medium' : 'low',
-        price: item.price || 0,
+        price: itemPrice,
         breakdown: result.breakdown,
         suggestions: result.suggestions,
-        confidence: result.confidence
+        confidence: result.confidence * receiptData.confidence // Combine confidences
       };
     });
 
     const totalCarbon = processedItems.reduce((sum, item) => sum + item.carbon, 0);
+    const totalPrice = receiptData.total || processedItems.reduce((sum, item) => sum + (item.price || 0), 0);
+
+    // Calculate advanced summary metrics
+    const categoryTotals: Record<string, number> = {};
+    processedItems.forEach(item => {
+      const carbonCategory = item.carbon > 8 ? 'High Impact' : 
+                            item.carbon > 3 ? 'Medium Impact' : 'Low Impact';
+      categoryTotals[carbonCategory] = (categoryTotals[carbonCategory] || 0) + item.carbon;
+    });
+
+    const highestImpactCategory = Object.entries(categoryTotals)
+      .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None';
+
+    const reductionPotential = processedItems.reduce((sum, item) => {
+      // Calculate potential reduction based on item type
+      if (item.name.toLowerCase().includes('beef') || item.name.toLowerCase().includes('lamb')) {
+        return sum + item.carbon * 0.85; // High reduction potential
+      } else if (item.name.toLowerCase().includes('dairy') || item.name.toLowerCase().includes('cheese')) {
+        return sum + item.carbon * 0.6; // Medium reduction potential
+      } else if (item.name.toLowerCase().includes('chicken') || item.name.toLowerCase().includes('fish')) {
+        return sum + item.carbon * 0.4; // Lower reduction potential
+      }
+      return sum + item.carbon * 0.2; // General reduction potential
+    }, 0);
+
+    const avgConfidence = processedItems.length > 0 ? 
+      processedItems.reduce((sum, item) => sum + (item.confidence || 0.7), 0) / processedItems.length : 0.7;
+
+    console.log(`Successfully processed ${processedItems.length} items with ${Math.round(avgConfidence * 100)}% confidence`);
 
     return {
-      store: receiptData.store || "Unknown Store",
-      date: receiptData.date || new Date().toISOString().split('T')[0],
+      store: receiptData.store,
+      date: receiptData.date,
       items: processedItems,
       totalCarbon: Math.round(totalCarbon * 100) / 100,
-      total: receiptData.total || processedItems.reduce((sum, item) => sum + (item.price || 0), 0),
+      total: Math.round(totalPrice * 100) / 100,
       location: "Receipt Location",
       equivalents: generateEquivalents(totalCarbon),
       summary: {
-        highest_impact_category: processedItems.length > 0 ? 
-          processedItems.reduce((max, item) => item.carbon > max.carbon ? item : max).name : "None",
-        reduction_potential_kg: Math.round(totalCarbon * 0.3 * 100) / 100,
-        improvement_score: Math.round(processedItems.reduce((sum, item) => sum + (item.confidence || 0.7), 0) / processedItems.length * 100) || 70
+        highest_impact_category: highestImpactCategory,
+        reduction_potential_kg: Math.round(reductionPotential * 100) / 100,
+        improvement_score: Math.round(avgConfidence * 100)
       }
     };
 
   } catch (error) {
-    console.error('AI OCR failed:', error);
+    console.error('Advanced AI OCR failed:', error);
     
-    // Fallback to simple processing
+    // Fallback strategy: Try with simpler prompt and different model
+    try {
+      console.log('Attempting fallback OCR with simpler approach...');
+      
+      const fallbackResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: 'Extract items and prices from this receipt. Return JSON with store, items array with name and price, and total.'
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'What items and prices do you see on this receipt?'
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: imageData
+                  }
+                }
+              ]
+            }
+          ],
+          max_tokens: 2000
+        }),
+      });
+
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        const fallbackContent = fallbackData.choices[0]?.message?.content;
+        
+        if (fallbackContent) {
+          console.log('Fallback response:', fallbackContent);
+          
+          // Try to extract any usable data from the fallback response
+          const items: ReceiptItem[] = [];
+          
+          // Look for price patterns in the text
+          const priceMatches = fallbackContent.match(/\$?\d+\.?\d*/g);
+          const itemMatches = fallbackContent.match(/[a-zA-Z][a-zA-Z\s]+(?=\s*\$?\d+\.?\d*)/g);
+          
+          if (priceMatches && itemMatches) {
+            const minLength = Math.min(priceMatches.length, itemMatches.length);
+            for (let i = 0; i < minLength && i < 10; i++) { // Limit to 10 items max
+              const price = parseFloat(priceMatches[i].replace('$', '')) || 0;
+              const name = itemMatches[i]?.trim() || `Item ${i + 1}`;
+              
+              if (price > 0 && price < 1000) { // Reasonable price range
+                const result = calculateItemEmissions(name, 1);
+                items.push({
+                  name,
+                  quantity: "1",
+                  carbon: result.emissions_kg,
+                  category: result.emissions_kg > 8 ? 'high' : result.emissions_kg > 3 ? 'medium' : 'low',
+                  price,
+                  breakdown: result.breakdown,
+                  suggestions: result.suggestions,
+                  confidence: 0.5 // Lower confidence for fallback
+                });
+              }
+            }
+          }
+          
+          if (items.length > 0) {
+            const totalCarbon = items.reduce((sum, item) => sum + item.carbon, 0);
+            const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+            
+            return {
+              store: "Extracted Store",
+              date: new Date().toISOString().split('T')[0],
+              items,
+              totalCarbon: Math.round(totalCarbon * 100) / 100,
+              total: Math.round(totalPrice * 100) / 100,
+              location: "Receipt Location",
+              equivalents: generateEquivalents(totalCarbon),
+              summary: {
+                highest_impact_category: items.length > 0 ? "Mixed Items" : "None",
+                reduction_potential_kg: Math.round(totalCarbon * 0.3 * 100) / 100,
+                improvement_score: 50
+              }
+            };
+          }
+        }
+      }
+    } catch (fallbackError) {
+      console.error('Fallback OCR also failed:', fallbackError);
+    }
+    
+    // Final fallback: Return empty but valid response
+    console.log('All OCR attempts failed, returning empty response');
     return {
-      store: "Receipt Processing Failed",
+      store: "Receipt Processing Failed - Please try a clearer image",
       date: new Date().toISOString().split('T')[0],
       items: [],
       totalCarbon: 0,
