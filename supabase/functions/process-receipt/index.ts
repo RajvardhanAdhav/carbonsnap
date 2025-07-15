@@ -275,6 +275,16 @@ async function processReceiptImage(imageData: string): Promise<ProcessedReceipt>
       throw new Error('OpenAI API key not found in environment variables');
     }
     
+    console.log('About to make OpenAI API call...');
+    console.log('Request details:', {
+      url: 'https://api.openai.com/v1/chat/completions',
+      method: 'POST',
+      hasAuthHeader: !!openaiApiKey,
+      imageDataPresent: !!imageData,
+      imageDataLength: imageData?.length || 0,
+      model: 'gpt-4o'
+    });
+    
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -335,12 +345,34 @@ IMPORTANT: Extract EVERY visible item. Companies need complete transaction data.
       }),
     });
 
+    console.log('OpenAI API call completed, checking response...');
+    console.log('Response status:', openaiResponse.status);
+    console.log('Response headers:', Object.fromEntries(openaiResponse.headers.entries()));
+    
     if (!openaiResponse.ok) {
-      console.error(`OpenAI API error: ${openaiResponse.status} - ${await openaiResponse.text()}`);
+      const errorText = await openaiResponse.text();
+      console.error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
       throw new Error(`OpenAI API failed with status ${openaiResponse.status}`);
     }
 
     const aiResponse = await openaiResponse.json();
+    console.log('OpenAI response structure:', {
+      hasChoices: !!aiResponse.choices,
+      choicesLength: aiResponse.choices?.length || 0,
+      hasUsage: !!aiResponse.usage,
+      usage: aiResponse.usage,
+      model: aiResponse.model,
+      id: aiResponse.id
+    });
+    
+    if (aiResponse.usage) {
+      console.log('Token usage details:', {
+        promptTokens: aiResponse.usage.prompt_tokens,
+        completionTokens: aiResponse.usage.completion_tokens, 
+        totalTokens: aiResponse.usage.total_tokens
+      });
+    }
+    
     console.log('OpenAI response received');
     
     if (!aiResponse.choices || !aiResponse.choices[0]?.message?.content) {
