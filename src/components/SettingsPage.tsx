@@ -1,23 +1,61 @@
 import { useState } from "react";
-import { ArrowLeft, Moon, Sun, Bell, Shield, HelpCircle, Info, User, Trash2, LogOut } from "lucide-react";
+import { ArrowLeft, Moon, Sun, Bell, Shield, HelpCircle, Info, User, Trash2, LogOut, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "next-themes";
+import { ProductivityTracker } from "@/components/ProductivityTracker";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const SettingsPage = () => {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState(true);
   const [autoScan, setAutoScan] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   const isDark = theme === "dark";
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleClearAllData = async () => {
+    if (!user) return;
+    
+    if (!confirm("Are you sure you want to delete all your scanned items and history? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsClearing(true);
+    try {
+      const { error } = await supabase
+        .from('scanned_items')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Data Cleared",
+        description: "All your scanning history has been deleted.",
+      });
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const settingsSections = [
@@ -97,7 +135,7 @@ const SettingsPage = () => {
       icon: Trash2,
       label: "Clear All Data",
       description: "Delete all scanned items and history",
-      action: () => console.log("Clear data"),
+      action: handleClearAllData,
       variant: "destructive" as const
     },
     {
@@ -123,7 +161,7 @@ const SettingsPage = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-2xl">
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
         {/* User Info */}
         {user && (
           <Card className="p-6 mb-6">
@@ -139,65 +177,85 @@ const SettingsPage = () => {
           </Card>
         )}
 
-        {/* Settings Sections */}
-        {settingsSections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">{section.title}</h3>
-            <Card className="divide-y">
-              {section.items.map((item, itemIndex) => (
-                <div key={itemIndex} className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-muted rounded-lg">
-                      <item.icon className="h-4 w-4 text-muted-foreground" />
+        {/* Tabs for Settings and Productivity */}
+        <Tabs defaultValue="settings" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="productivity" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Progress
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="settings" className="space-y-6">
+            {/* Settings Sections */}
+            {settingsSections.map((section, sectionIndex) => (
+              <div key={sectionIndex} className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">{section.title}</h3>
+                <Card className="divide-y">
+                  {section.items.map((item, itemIndex) => (
+                    <div key={itemIndex} className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-lg">
+                          <item.icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{item.label}</p>
+                          <p className="text-sm text-muted-foreground">{item.description}</p>
+                        </div>
+                      </div>
+                      {item.control}
                     </div>
-                    <div>
-                      <p className="font-medium">{item.label}</p>
-                      <p className="text-sm text-muted-foreground">{item.description}</p>
+                  ))}
+                </Card>
+              </div>
+            ))}
+
+            <Separator className="my-6" />
+
+            {/* Account Actions */}
+            <div className="space-y-2">
+              {accountActions.map((action, index) => (
+                <Card key={index} className="p-0 overflow-hidden">
+                  <Button
+                    variant="ghost"
+                    className={`w-full justify-start p-4 h-auto ${
+                      action.variant === 'destructive' ? 'text-destructive hover:text-destructive hover:bg-destructive/10' : ''
+                    }`}
+                    onClick={action.action}
+                    disabled={action.label === "Clear All Data" && isClearing}
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className={`p-2 rounded-lg ${
+                        action.variant === 'destructive' ? 'bg-destructive/10' : 'bg-muted'
+                      }`}>
+                        <action.icon className={`h-4 w-4 ${
+                          action.variant === 'destructive' ? 'text-destructive' : 'text-muted-foreground'
+                        }`} />
+                      </div>
+                      <div className="text-left">
+                        <p className="font-medium">
+                          {action.label === "Clear All Data" && isClearing ? "Clearing..." : action.label}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{action.description}</p>
+                      </div>
                     </div>
-                  </div>
-                  {item.control}
-                </div>
+                  </Button>
+                </Card>
               ))}
-            </Card>
-          </div>
-        ))}
+            </div>
 
-        <Separator className="my-6" />
+            {/* App Info */}
+            <div className="mt-8 text-center text-sm text-muted-foreground">
+              <p>Carbon Snap v1.0.0</p>
+              <p>Made with 💚 for a sustainable future</p>
+            </div>
+          </TabsContent>
 
-        {/* Account Actions */}
-        <div className="space-y-2">
-          {accountActions.map((action, index) => (
-            <Card key={index} className="p-0 overflow-hidden">
-              <Button
-                variant="ghost"
-                className={`w-full justify-start p-4 h-auto ${
-                  action.variant === 'destructive' ? 'text-destructive hover:text-destructive hover:bg-destructive/10' : ''
-                }`}
-                onClick={action.action}
-              >
-                <div className="flex items-center gap-3 w-full">
-                  <div className={`p-2 rounded-lg ${
-                    action.variant === 'destructive' ? 'bg-destructive/10' : 'bg-muted'
-                  }`}>
-                    <action.icon className={`h-4 w-4 ${
-                      action.variant === 'destructive' ? 'text-destructive' : 'text-muted-foreground'
-                    }`} />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium">{action.label}</p>
-                    <p className="text-sm text-muted-foreground">{action.description}</p>
-                  </div>
-                </div>
-              </Button>
-            </Card>
-          ))}
-        </div>
-
-        {/* App Info */}
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>Carbon Snap v1.0.0</p>
-          <p>Made with 💚 for a sustainable future</p>
-        </div>
+          <TabsContent value="productivity">
+            <ProductivityTracker />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

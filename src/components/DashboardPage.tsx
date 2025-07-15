@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { AdvancedDashboard } from "@/components/enhanced/AdvancedDashboard";
+import { DemoDataButton } from "@/components/DemoDataButton";
 
 const DashboardPage = () => {
   const { user, session } = useAuth();
@@ -17,6 +18,7 @@ const DashboardPage = () => {
   const [recentScans, setRecentScans] = useState<any[]>([]);
   const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     if (user && session?.access_token) {
@@ -213,13 +215,19 @@ const DashboardPage = () => {
     <div className="min-h-screen bg-background animate-fade-in">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300">
-        <div className="container mx-auto px-4 h-14 flex items-center gap-4">
-          <Link to="/">
-            <Button variant="ghost" size="sm" className="hover-scale transition-all duration-200">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="font-semibold">Dashboard</h1>
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link to="/">
+              <Button variant="ghost" size="sm" className="hover-scale transition-all duration-200">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <h1 className="font-semibold">Dashboard</h1>
+          </div>
+          <DemoDataButton onDataAdded={() => {
+            fetchDashboardData();
+            fetchRecentScans();
+          }} />
         </div>
       </header>
 

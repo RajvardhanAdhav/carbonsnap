@@ -122,3 +122,40 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Carbon footprint color utilities */
+.text-carbon-low {
+  color: hsl(var(--carbon-low));
+}
+
+.text-carbon-medium {
+  color: hsl(var(--carbon-medium));
+}
+
+.text-carbon-high {
+  color: hsl(var(--carbon-high));
+}
+
+.bg-carbon-low {
+  background-color: hsl(var(--carbon-low));
+}
+
+.bg-carbon-medium {
+  background-color: hsl(var(--carbon-medium));
+}
+
+.bg-carbon-high {
+  background-color: hsl(var(--carbon-high));
+}
+
+.border-carbon-low {
+  border-color: hsl(var(--carbon-low));
+}
+
+.border-carbon-medium {
+  border-color: hsl(var(--carbon-medium));
+}
+
+.border-carbon-high {
+  border-color: hsl(var(--carbon-high));
+}
