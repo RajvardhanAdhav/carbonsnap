@@ -25,7 +25,8 @@ export interface ReceiptDetection {
  * Advanced Gaussian blur for noise reduction
  */
 export function gaussianBlur(canvas: HTMLCanvasElement, radius = 1): HTMLCanvasElement {
-  const ctx = canvas.getContext('2d');
+  console.log('Starting Gaussian blur processing, canvas size:', canvas.width, 'x', canvas.height);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('Canvas context not available');
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -107,7 +108,8 @@ function createGaussianKernel(radius: number): number[][] {
  * Convert image to grayscale with better color preservation
  */
 export function convertToGrayscale(canvas: HTMLCanvasElement): HTMLCanvasElement {
-  const ctx = canvas.getContext('2d');
+  console.log('Converting to grayscale, canvas size:', canvas.width, 'x', canvas.height);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('Canvas context not available');
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -130,7 +132,8 @@ export function convertToGrayscale(canvas: HTMLCanvasElement): HTMLCanvasElement
  * Advanced adaptive thresholding with local area analysis
  */
 export function applyAdaptiveThreshold(canvas: HTMLCanvasElement): HTMLCanvasElement {
-  const ctx = canvas.getContext('2d');
+  console.log('Applying adaptive threshold, canvas size:', canvas.width, 'x', canvas.height);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('Canvas context not available');
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -181,7 +184,8 @@ export function applyAdaptiveThreshold(canvas: HTMLCanvasElement): HTMLCanvasEle
  * Enhanced contrast adjustment with histogram equalization
  */
 export function enhanceContrast(canvas: HTMLCanvasElement, factor = 1.5): HTMLCanvasElement {
-  const ctx = canvas.getContext('2d');
+  console.log('Enhancing contrast, canvas size:', canvas.width, 'x', canvas.height);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('Canvas context not available');
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -226,7 +230,8 @@ export function enhanceContrast(canvas: HTMLCanvasElement, factor = 1.5): HTMLCa
  * Advanced receipt detection using multiple algorithms
  */
 export function detectReceipt(canvas: HTMLCanvasElement): ReceiptDetection {
-  const ctx = canvas.getContext('2d');
+  console.log('Detecting receipt, canvas size:', canvas.width, 'x', canvas.height);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return { isReceiptDetected: false, confidence: 0 };
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -397,12 +402,15 @@ export function correctPerspective(canvas: HTMLCanvasElement): HTMLCanvasElement
  * Process image for optimal OCR with all advanced techniques
  */
 export async function preprocessImageForOCR(imageDataUrl: string): Promise<ProcessedImage> {
-  return new Promise((resolve) => {
+  console.log('Starting image preprocessing for OCR');
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context not available');
+      try {
+        console.log('Image loaded, original size:', img.width, 'x', img.height);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) throw new Error('Canvas context not available');
 
       // Set canvas size to image size
       canvas.width = img.width;
@@ -412,19 +420,34 @@ export async function preprocessImageForOCR(imageDataUrl: string): Promise<Proce
       ctx.drawImage(img, 0, 0);
 
       // Apply advanced preprocessing pipeline
+      console.log('Starting preprocessing pipeline...');
       gaussianBlur(canvas, 0.5); // Light denoising
+      console.log('Gaussian blur completed');
       enhanceContrast(canvas, 1.4); // Enhance contrast
+      console.log('Contrast enhancement completed');
       convertToGrayscale(canvas); // Convert to grayscale
+      console.log('Grayscale conversion completed');
       applyAdaptiveThreshold(canvas); // Adaptive thresholding
+      console.log('Adaptive threshold completed');
       
       // Detect receipt quality
       const detection = detectReceipt(canvas);
+      console.log('Receipt detection completed, confidence:', detection.confidence);
+      console.log('Detection suggestions:', detection.suggestions);
 
       resolve({
         processedDataUrl: canvas.toDataURL('image/png'),
         confidence: detection.confidence,
         boundingBox: detection.boundingBox
       });
+      } catch (error) {
+        console.error('Error in image preprocessing:', error);
+        reject(error);
+      }
+    };
+    img.onerror = (error) => {
+      console.error('Error loading image:', error);
+      reject(new Error('Failed to load image'));
     };
     img.src = imageDataUrl;
   });

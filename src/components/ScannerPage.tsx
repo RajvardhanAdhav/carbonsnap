@@ -24,6 +24,7 @@ const ScannerPage = () => {
   const [scanResult, setScanResult] = useState<any>(null);
 
   const processImage = async (imageData: string, scanMethod: string = 'camera') => {
+    console.log('ProcessImage called with scanMethod:', scanMethod, 'imageData length:', imageData.length);
     if (!user || !session?.access_token) {
       throw new Error('User not authenticated');
     }
@@ -32,6 +33,7 @@ const ScannerPage = () => {
     
     try {
       if (scanMode === 'receipt') {
+        console.log('Sending receipt to process-receipt function...');
         const { data, error } = await supabase.functions.invoke('process-receipt', {
           body: { imageData, scanMethod },
           headers: {
@@ -39,12 +41,16 @@ const ScannerPage = () => {
           },
         });
 
-        if (error) throw error;
+        console.log('Process-receipt response:', { data, error });
+        if (error) {
+          console.error('Supabase function error:', error);
+          throw error;
+        }
         setScanResult({ type: 'receipt', ...data.data });
       }
     } catch (error) {
       console.error('Error processing image:', error);
-      alert('Failed to process image. Please try again.');
+      alert(`Receipt Processing Failed - ${error.message || 'Please try a clearer image or manual input'}`);
     } finally {
       setIsScanning(false);
       setShowCamera(false);
