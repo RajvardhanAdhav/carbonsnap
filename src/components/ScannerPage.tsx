@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Camera, Upload, Scan, Receipt, ArrowLeft, CheckCircle, Edit, Loader2, BarChart3 } from "lucide-react";
+import { Camera, Upload, Scan, Receipt, ArrowLeft, CheckCircle, Edit, Loader2, BarChart3, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import CameraScanner from "./CameraScanner";
@@ -22,6 +23,18 @@ const ScannerPage = () => {
   const [showReductionTips, setShowReductionTips] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('groq_api_key') || '');
+  const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(() => !localStorage.getItem('groq_api_key'));
+
+  const saveApiKey = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem('groq_api_key', apiKey.trim());
+      setShowApiKeyInput(false);
+      setError(null);
+    } else {
+      setError('Please enter a valid API key');
+    }
+  };
 
   const processImage = async (imageData: string, scanMethod: string = 'camera') => {
     console.log('ProcessImage called with scanMethod:', scanMethod, 'imageData length:', imageData.length);
@@ -30,35 +43,67 @@ const ScannerPage = () => {
       return;
     }
 
+    const savedApiKey = localStorage.getItem('groq_api_key');
+    if (!savedApiKey) {
+      setError('Please enter your Groq API key first');
+      setShowApiKeyInput(true);
+      return;
+    }
+
     setIsScanning(true);
     setError(null);
     
     try {
       if (scanMode === 'receipt') {
-        console.log('Sending receipt to Groq via edge function...');
+        console.log('Sending receipt to Groq API...');
         
-        const response = await fetch('https://mdwpmbmesoxxbamvdwqa.supabase.co/functions/v1/groq-receipt-processor', {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${savedApiKey}`,
           },
           body: JSON.stringify({
-            imageData,
-            inputType: 'image'
+            messages: [
+              {
+                role: 'system',
+                content: 'Analyze receipt images and extract all items with their carbon footprint. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+              },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Please analyze this receipt and provide the carbon footprint data in JSON format'
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: imageData
+                    }
+                  }
+                ]
+              }
+            ],
+            model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+            temperature: 1,
+            max_completion_tokens: 1024,
+            top_p: 1,
+            stream: false,
+            response_format: {
+              type: 'json_object'
+            },
+            stop: null
           }),
         });
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || `Edge function error: ${response.status}`);
+          throw new Error(errorData.error?.message || `Groq API error: ${response.status}`);
         }
 
-        const { success, data: result, error } = await response.json();
-        
-        if (!success) {
-          throw new Error(error || 'Failed to process receipt');
-        }
+        const data = await response.json();
+        const result = JSON.parse(data.choices[0].message.content);
         
         setScanResult({ 
           type: 'receipt', 
@@ -83,39 +128,65 @@ const ScannerPage = () => {
       return;
     }
 
+    const savedApiKey = localStorage.getItem('groq_api_key');
+    if (!savedApiKey) {
+      setError('Please enter your Groq API key first');
+      setShowApiKeyInput(true);
+      return;
+    }
+
     setIsScanning(true);
     setError(null);
     
     try {
-      const response = await fetch('https://mdwpmbmesoxxbamvdwqa.supabase.co/functions/v1/groq-receipt-processor', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kd3BtYm1lc294eGJhbXZkd3FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIzMjgxMDMsImV4cCI6MjA2NzkwNDEwM30.VoaIXbvZT1nbL2BUxHWQtCgtHsCINDkGFGAojTUuQEQ`,
+          'Authorization': `Bearer ${savedApiKey}`,
         },
         body: JSON.stringify({
-          data,
-          inputType: 'manual'
+          messages: [
+            {
+              role: 'system',
+              content: 'Analyze manual receipt data and calculate carbon footprints. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `Please analyze this manual receipt data: ${JSON.stringify(data)}`
+                }
+              ]
+            }
+          ],
+          model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+          temperature: 1,
+          max_completion_tokens: 1024,
+          top_p: 1,
+          stream: false,
+          response_format: {
+            type: 'json_object'
+          },
+          stop: null
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Edge function error: ${response.status}`);
+        throw new Error(errorData.error?.message || `Groq API error: ${response.status}`);
       }
 
-      const { success, data: result, error } = await response.json();
-      
-      if (!success) {
-        throw new Error(error || 'Failed to process manual input');
-      }
+      const result = await response.json();
+      const parsedResult = JSON.parse(result.choices[0].message.content);
       
       setScanResult({ 
         type: 'receipt', 
-        store: result.store || 'Manual Input',
-        date: result.date || new Date().toLocaleDateString(),
-        items: result.items || [],
-        totalCarbon: result.totalCarbon || 0
+        store: parsedResult.store || 'Manual Input',
+        date: parsedResult.date || new Date().toLocaleDateString(),
+        items: parsedResult.items || [],
+        totalCarbon: parsedResult.totalCarbon || 0
       });
     } catch (error) {
       console.error('Error processing manual input:', error);
@@ -132,41 +203,67 @@ const ScannerPage = () => {
       return;
     }
 
+    const savedApiKey = localStorage.getItem('groq_api_key');
+    if (!savedApiKey) {
+      setError('Please enter your Groq API key first');
+      setShowApiKeyInput(true);
+      return;
+    }
+
     setIsScanning(true);
     setShowBarcodeScanner(false);
     setError(null);
     
     try {
-      const response = await fetch('https://mdwpmbmesoxxbamvdwqa.supabase.co/functions/v1/groq-receipt-processor', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kd3BtYm1lc294eGJhbXZkd3FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIzMjgxMDMsImV4cCI6MjA2NzkwNDEwM30.VoaIXbvZT1nbL2BUxHWQtCgtHsCINDkGFGAojTUuQEQ`,
+          'Authorization': `Bearer ${savedApiKey}`,
         },
         body: JSON.stringify({
-          data: barcode,
-          inputType: 'barcode'
+          messages: [
+            {
+              role: 'system',
+              content: 'Analyze barcode data and provide product information with carbon footprint. Return a JSON object with: name, brand, carbon footprint in kg CO2e, category (low/medium/high), and details object containing material, origin, transport, and packaging information. Use typical values for common products.'
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `Please analyze this barcode: ${barcode} and provide product information`
+                }
+              ]
+            }
+          ],
+          model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+          temperature: 1,
+          max_completion_tokens: 1024,
+          top_p: 1,
+          stream: false,
+          response_format: {
+            type: 'json_object'
+          },
+          stop: null
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Edge function error: ${response.status}`);
+        throw new Error(errorData.error?.message || `Groq API error: ${response.status}`);
       }
 
-      const { success, data: result, error } = await response.json();
-      
-      if (!success) {
-        throw new Error(error || 'Failed to process barcode');
-      }
+      const result = await response.json();
+      const parsedResult = JSON.parse(result.choices[0].message.content);
       
       setScanResult({ 
         type: 'item', 
-        name: result.name || 'Unknown Product',
-        brand: result.brand || 'Unknown Brand',
-        carbon: result.carbon || 0,
-        category: result.category || 'medium',
-        details: result.details || {
+        name: parsedResult.name || 'Unknown Product',
+        brand: parsedResult.brand || 'Unknown Brand',
+        carbon: parsedResult.carbon || 0,
+        category: parsedResult.category || 'medium',
+        details: parsedResult.details || {
           material: 'Unknown',
           origin: 'Unknown',
           transport: 'Unknown',
@@ -210,8 +307,46 @@ const ScannerPage = () => {
             </Button>
           </Link>
           <h1 className="font-semibold">Carbon Scanner</h1>
+          <div className="ml-auto">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
+
+      {/* API Key Input */}
+      {showApiKeyInput && (
+        <div className="border-b bg-muted/30 p-4">
+          <div className="container mx-auto max-w-2xl">
+            <div className="space-y-3">
+              <h3 className="font-medium">Groq API Key</h3>
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder="Enter your Groq API key..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={saveApiKey} size="sm">
+                  Save
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Your API key will be stored locally in your browser. Get your key from{" "}
+                <a href="https://groq.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                  groq.com
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         {showCamera ? (
