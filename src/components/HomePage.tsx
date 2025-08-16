@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import AuthModal from "./AuthModal";
-import { TestOpenAI } from "./TestOpenAI";
+
 
 const HomePage = () => {
   const { user, signOut } = useAuth();
@@ -256,14 +256,6 @@ const HomePage = () => {
         </div>
       </footer>
 
-      {/* OpenAI API Test Section - Development Only */}
-      {process.env.NODE_ENV === 'development' && (
-        <section className="px-4 py-8 bg-muted/30">
-          <div className="container mx-auto max-w-md">
-            <TestOpenAI />
-          </div>
-        </section>
-      )}
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
