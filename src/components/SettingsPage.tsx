@@ -127,7 +127,7 @@ const SettingsPage = () => {
     {
       icon: Info,
       label: "About Carbon Snap",
-      description: "Version 1.0.0",
+      description: "Version 1.0.0 • Created by Rajvardhan Adhav",
       action: () => console.log("About"),
       variant: "default" as const
     },
@@ -248,6 +248,7 @@ const SettingsPage = () => {
             {/* App Info */}
             <div className="mt-8 text-center text-sm text-muted-foreground">
               <p>Carbon Snap v1.0.0</p>
+              <p>Created by Rajvardhan Adhav</p>
               <p>Made with 💚 for a sustainable future</p>
             </div>
           </TabsContent>
