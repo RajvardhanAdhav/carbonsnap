@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { AdvancedDashboard } from "@/components/enhanced/AdvancedDashboard";
-import { DemoDataButton } from "@/components/DemoDataButton";
+
 
 const DashboardPage = () => {
   const { user, session } = useAuth();
@@ -224,10 +224,6 @@ const DashboardPage = () => {
             </Link>
             <h1 className="font-semibold">Dashboard</h1>
           </div>
-          <DemoDataButton onDataAdded={() => {
-            fetchDashboardData();
-            fetchRecentScans();
-          }} />
         </div>
       </header>
 
