@@ -1,290 +1,258 @@
 import { useState } from "react";
-import { Camera, Scan, BarChart3, Leaf, Zap, Target, LogOut, User, Settings, Info, ExternalLink, Award } from "lucide-react";
+import { Camera, Scan, BarChart3, Leaf, ArrowRight, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import AuthModal from "./AuthModal";
 import { TestOpenAI } from "./TestOpenAI";
-import heroImage from "@/assets/carbon-snap-hero.jpg";
 
 const HomePage = () => {
   const { user, signOut } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+
   const features = [
     {
       icon: Camera,
-      title: "Receipt Scanner",
-      description: "Snap photos of receipts to instantly calculate carbon footprint",
-      color: "eco-primary"
+      title: "Smart Receipt Scanner",
+      description: "AI-powered receipt analysis for instant carbon footprint calculations",
+      href: "/scanner"
     },
     {
       icon: Scan,
-      title: "Item Scanner",
-      description: "Scan individual products with barcode or image recognition",
-      color: "eco-secondary"
+      title: "Product Scanner",
+      description: "Scan any product to understand its environmental impact",
+      href: "/scanner"
     },
     {
       icon: BarChart3,
-      title: "Carbon Analytics",
-      description: "Track your emissions over time with detailed insights",
-      color: "accent"
+      title: "Impact Dashboard",
+      description: "Track your progress with detailed analytics and insights",
+      href: "/dashboard"
     }
   ];
 
   const stats = [
-    { value: "2.5kg", label: "CO₂ Saved This Week" },
-    { value: "150+", label: "Items Scanned" },
-    { value: "89%", label: "Carbon Reduction Goal" }
+    { value: "2.5kg", label: "CO₂ Saved This Week", color: "text-emerald-600" },
+    { value: "150+", label: "Items Analyzed", color: "text-blue-600" },
+    { value: "89%", label: "Goal Progress", color: "text-purple-600" }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-eco-light">
-      {/* Navigation */}
-      <nav className="absolute top-0 left-0 right-0 z-10 p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2 text-eco-primary">
-            <Leaf className="h-6 w-6" />
-            <span className="font-semibold">Carbon Snap</span>
+    <div className="min-h-screen bg-background">
+      {/* Clean Navigation */}
+      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/40">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-eco rounded-lg flex items-center justify-center">
+              <Leaf className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-semibold text-lg">Carbon Snap</span>
           </div>
           
-          {user ? (
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                Welcome, {user.user_metadata?.full_name || user.email}
-              </span>
-              <Link to="/settings">
-                <Button variant="outline" size="sm">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
+          <div className="flex items-center gap-3">
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Link to="/dashboard">
+                  <Button variant="ghost" size="sm">Dashboard</Button>
+                </Link>
+                <Link to="/scanner">
+                  <Button variant="ghost" size="sm">Scanner</Button>
+                </Link>
+                <Button 
+                  onClick={signOut}
+                  variant="outline" 
+                  size="sm"
+                >
+                  Sign Out
                 </Button>
-              </Link>
-              <Button variant="outline" size="sm" onClick={signOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+              </div>
+            ) : (
+              <Button 
+                onClick={() => setShowAuthModal(true)}
+                size="sm"
+              >
+                Get Started
               </Button>
-            </div>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setShowAuthModal(true)}>
-              <User className="h-4 w-4 mr-2" />
-              Sign In
-            </Button>
-          )}
+            )}
+          </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden px-4 py-16 lg:py-24 pt-24">
-        <div className="container mx-auto max-w-6xl">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8 animate-fade-in">
-              <div className="flex items-center gap-2 text-eco-primary">
-                <Leaf className="h-6 w-6" />
-                <span className="font-semibold">Carbon Snap</span>
-              </div>
-              
-              <h1 className="text-4xl lg:text-6xl font-bold text-foreground leading-tight">
-                Track Your
-                <span className="text-transparent bg-gradient-eco bg-clip-text block">
-                  Carbon Footprint
-                </span>
-                Effortlessly
-              </h1>
-              
-              <p className="text-xl text-muted-foreground max-w-lg">
-                Scan receipts and items to understand your environmental impact. 
-                Get personalized insights and tips to reduce your carbon footprint.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
-                {user ? (
-                  <>
-                    <Link to="/scanner">
-                      <Button size="lg" className="w-full sm:w-auto bg-gradient-eco hover:opacity-90 shadow-eco">
-                        <Camera className="mr-2 h-5 w-5" />
-                        Start Scanning
-                      </Button>
-                    </Link>
-                    <Link to="/dashboard">
-                      <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                        <BarChart3 className="mr-2 h-5 w-5" />
-                        View Dashboard
-                      </Button>
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <Button 
-                      size="lg" 
-                      className="w-full sm:w-auto bg-gradient-eco hover:opacity-90 shadow-eco"
-                      onClick={() => setShowAuthModal(true)}
-                    >
-                      <Camera className="mr-2 h-5 w-5" />
-                      Get Started
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="lg" 
-                      className="w-full sm:w-auto"
-                      onClick={() => setShowAuthModal(true)}
-                    >
-                      <BarChart3 className="mr-2 h-5 w-5" />
-                      Learn More
-                    </Button>
-                  </>
-                )}
-              </div>
+      <section className="relative px-4 py-20 lg:py-32">
+        <div className="container mx-auto max-w-4xl text-center">
+          <div className="space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-eco-light/50 text-eco-primary text-sm font-medium">
+              <Leaf className="h-3 w-3" />
+              Track your environmental impact
             </div>
             
-            <div className="relative animate-scale-in">
-              <img 
-                src={heroImage} 
-                alt="Carbon Snap App Interface" 
-                className="rounded-2xl shadow-eco max-w-full h-auto"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent rounded-2xl" />
+            <h1 className="text-4xl lg:text-6xl font-bold tracking-tight">
+              Know Your Carbon
+              <span className="block text-eco-primary">Footprint</span>
+            </h1>
+            
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Scan receipts and products to instantly understand your environmental impact. 
+              Get personalized insights to reduce your carbon footprint.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
+              {user ? (
+                <div className="flex gap-3">
+                  <Link to="/scanner">
+                    <Button size="lg" className="h-12 px-8">
+                      <Camera className="mr-2 h-4 w-4" />
+                      Start Scanning
+                    </Button>
+                  </Link>
+                  <Link to="/dashboard">
+                    <Button variant="outline" size="lg" className="h-12 px-8">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      View Dashboard
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={() => setShowAuthModal(true)}
+                    size="lg" 
+                    className="h-12 px-8"
+                  >
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="lg" 
+                    className="h-12 px-8"
+                    onClick={() => {
+                      document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    See Demo
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
 
       {/* Stats Section */}
-      <section className="px-4 py-12">
-        <div className="container mx-auto max-w-4xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {stats.map((stat, index) => (
-              <Card key={index} className="p-6 text-center bg-card/50 backdrop-blur-sm border-0 shadow-soft">
-                <div className="text-3xl font-bold text-eco-primary mb-2">{stat.value}</div>
-                <div className="text-muted-foreground">{stat.label}</div>
-              </Card>
-            ))}
+      {user && (
+        <section className="px-4 py-16">
+          <div className="container mx-auto max-w-4xl">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {stats.map((stat, index) => (
+                <Card key={index} className="border-0 shadow-soft">
+                  <CardContent className="p-6 text-center">
+                    <div className={`text-3xl font-bold ${stat.color}`}>
+                      {stat.value}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {stat.label}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Features Section */}
-      <section className="px-4 py-16">
+      <section id="demo" className="px-4 py-20 bg-muted/30">
         <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">How Carbon Snap Works</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Three simple steps to understand and reduce your environmental impact
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
+              Simple. Powerful. Sustainable.
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to understand and reduce your environmental impact
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="p-8 text-center border-0 shadow-soft hover:shadow-eco transition-all duration-300 group hover:-translate-y-2">
-                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-${feature.color}/10 mb-6 group-hover:scale-110 transition-transform`}>
-                  <feature.icon className={`h-8 w-8 text-${feature.color}`} />
-                </div>
-                <h3 className="text-xl font-semibold mb-4">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
+              <Card key={index} className="group hover:shadow-eco transition-all duration-300 border-0 bg-background">
+                <CardContent className="p-8">
+                  <div className="mb-6">
+                    <div className="w-12 h-12 bg-gradient-eco rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <feature.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">
+                      {feature.title}
+                    </h3>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {feature.description}
+                    </p>
+                  </div>
+                  
+                  {user && (
+                    <Link to={feature.href}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="group-hover:bg-eco-primary group-hover:text-white transition-colors"
+                      >
+                        Try it now
+                        <ArrowRight className="ml-2 h-3 w-3" />
+                      </Button>
+                    </Link>
+                  )}
+                </CardContent>
               </Card>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* About Our Mission */}
-      <section className="px-4 py-16 bg-gradient-to-br from-eco-light/30 to-background">
-        <div className="container mx-auto max-w-6xl">
-          <Card className="p-8 hover-scale transition-all duration-300 hover:shadow-lg bg-gradient-to-br from-eco-light/30 to-background border border-eco-primary/20">
-            <div className="text-center max-w-4xl mx-auto">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Info className="h-6 w-6 text-eco-primary animate-pulse" />
-                <h2 className="text-2xl font-bold">About Carbon Snap</h2>
-              </div>
-              
-              <p className="text-lg text-muted-foreground mb-6 leading-relaxed">
-                Our mission is to democratize carbon footprint awareness by making environmental impact tracking 
-                accessible, accurate, and actionable for everyone. Through cutting-edge AI technology and intuitive 
-                design, we empower individuals to make informed decisions that contribute to a more sustainable future.
-              </p>
-              
-              <div className="grid md:grid-cols-3 gap-6 mb-6">
-                <div className="p-4 rounded-lg bg-background/50 hover-scale transition-all duration-300">
-                  <Zap className="h-8 w-8 text-eco-primary mx-auto mb-2" />
-                  <h3 className="font-semibold mb-2">AI-Powered Analysis</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Advanced machine learning algorithms provide precise carbon footprint calculations
-                  </p>
-                </div>
-                
-                <div className="p-4 rounded-lg bg-background/50 hover-scale transition-all duration-300">
-                  <Target className="h-8 w-8 text-eco-primary mx-auto mb-2" />
-                  <h3 className="font-semibold mb-2">Actionable Insights</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Personalized recommendations to reduce your environmental impact effectively
-                  </p>
-                </div>
-                
-                <div className="p-4 rounded-lg bg-background/50 hover-scale transition-all duration-300">
-                  <Award className="h-8 w-8 text-eco-primary mx-auto mb-2" />
-                  <h3 className="font-semibold mb-2">Community Impact</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Join thousands of users making a collective difference for our planet
-                  </p>
-                </div>
-              </div>
-              
-              <div className="p-4 rounded-lg bg-eco-primary/10 border border-eco-primary/30 mb-4">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <ExternalLink className="h-4 w-4 text-eco-primary" />
-                  <span className="font-medium text-eco-primary">Born from Innovation</span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Carbon Snap began as a solo project at a DevPost hackathon, where I recognized 
-                  the urgent need for accessible environmental impact tracking. What started as a weekend 
-                  prototype has evolved into a comprehensive platform serving environmentally conscious 
-                  consumers worldwide.
-                </p>
-              </div>
-              
-              <p className="text-sm text-muted-foreground italic">
-                "Every scan brings us one step closer to a carbon-neutral future."
-              </p>
-            </div>
-          </Card>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="px-4 py-16 bg-gradient-eco">
-        <div className="container mx-auto max-w-4xl text-center">
-          <div className="space-y-6 text-white">
-            <div className="flex justify-center items-center gap-2 mb-4">
-              <Target className="h-8 w-8" />
-              <Zap className="h-8 w-8" />
-            </div>
-            <h2 className="text-3xl lg:text-4xl font-bold">Ready to Make a Difference?</h2>
-            <p className="text-xl opacity-90 max-w-2xl mx-auto">
-              Join thousands of users reducing their carbon footprint one scan at a time
-            </p>
-            {user ? (
-              <Link to="/scanner">
-                <Button size="lg" variant="secondary" className="bg-white text-eco-primary hover:bg-white/90">
-                  <Camera className="mr-2 h-5 w-5" />
-                  Start Your Journey
-                </Button>
-              </Link>
-            ) : (
+      {!user && (
+        <section className="px-4 py-20">
+          <div className="container mx-auto max-w-4xl text-center">
+            <div className="bg-gradient-eco rounded-3xl p-12 text-white">
+              <h2 className="text-3xl lg:text-4xl font-bold mb-4">
+                Ready to make a difference?
+              </h2>
+              <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto">
+                Join thousands of users already tracking and reducing their carbon footprint.
+                Start your sustainable journey today.
+              </p>
               <Button 
-                size="lg" 
-                variant="secondary" 
-                className="bg-white text-eco-primary hover:bg-white/90"
                 onClick={() => setShowAuthModal(true)}
+                size="lg"
+                variant="secondary"
+                className="h-12 px-8 bg-white text-eco-primary hover:bg-white/90"
               >
-                <Camera className="mr-2 h-5 w-5" />
-                Start Your Journey
+                Get Started Free
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-            )}
-            <p className="text-xs text-white/70 mt-8">
-              Made by Rajvardhan Adhav
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Footer */}
+      <footer className="px-4 py-12 border-t border-border/40">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="w-6 h-6 bg-gradient-eco rounded-lg flex items-center justify-center">
+                <Leaf className="h-3 w-3 text-white" />
+              </div>
+              <span className="font-semibold">Carbon Snap</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Made with 💚 for a sustainable future
             </p>
           </div>
         </div>
-      </section>
+      </footer>
 
       {/* OpenAI API Test Section - Development Only */}
       {process.env.NODE_ENV === 'development' && (
