@@ -70,6 +70,7 @@ const HomePage = () => {
             ) : (
               <Button 
                 onClick={() => setShowAuthModal(true)}
+                variant="clean"
                 size="sm"
               >
                 Get Started
@@ -102,13 +103,13 @@ const HomePage = () => {
               {user ? (
                 <div className="flex gap-3">
                   <Link to="/scanner">
-                    <Button size="lg" className="h-12 px-8">
+                    <Button size="lg" variant="clean" className="h-11 px-6">
                       <Camera className="mr-2 h-4 w-4" />
                       Start Scanning
                     </Button>
                   </Link>
                   <Link to="/dashboard">
-                    <Button variant="outline" size="lg" className="h-12 px-8">
+                    <Button variant="subtle" size="lg" className="h-11 px-6">
                       <BarChart3 className="mr-2 h-4 w-4" />
                       View Dashboard
                     </Button>
@@ -118,16 +119,17 @@ const HomePage = () => {
                 <div className="flex gap-3">
                   <Button 
                     onClick={() => setShowAuthModal(true)}
+                    variant="clean"
                     size="lg" 
-                    className="h-12 px-8"
+                    className="h-11 px-6"
                   >
-                    Get Started Free
+                    Get Started
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <Button 
-                    variant="outline" 
+                    variant="subtle" 
                     size="lg" 
-                    className="h-12 px-8"
+                    className="h-11 px-6"
                     onClick={() => {
                       document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                     }}
@@ -197,7 +199,7 @@ const HomePage = () => {
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        className="group-hover:bg-eco-primary group-hover:text-white transition-colors"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         Try it now
                         <ArrowRight className="ml-2 h-3 w-3" />
@@ -215,21 +217,21 @@ const HomePage = () => {
       {!user && (
         <section className="px-4 py-20">
           <div className="container mx-auto max-w-4xl text-center">
-            <div className="bg-gradient-eco rounded-3xl p-12 text-white">
+            <div className="bg-foreground rounded-2xl p-12 text-background">
               <h2 className="text-3xl lg:text-4xl font-bold mb-4">
                 Ready to make a difference?
               </h2>
-              <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto">
+              <p className="text-lg opacity-80 mb-8 max-w-2xl mx-auto">
                 Join thousands of users already tracking and reducing their carbon footprint.
                 Start your sustainable journey today.
               </p>
               <Button 
                 onClick={() => setShowAuthModal(true)}
                 size="lg"
-                variant="secondary"
-                className="h-12 px-8 bg-white text-eco-primary hover:bg-white/90"
+                variant="outline"
+                className="h-11 px-6 border-background text-background hover:bg-background hover:text-foreground"
               >
-                Get Started Free
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
