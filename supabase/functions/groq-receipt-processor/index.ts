@@ -24,7 +24,7 @@ serve(async (req) => {
       messages = [
         {
           role: 'system',
-          content: 'Analyze receipt images and extract all items with their carbon footprint. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+          content: 'You are a carbon footprint analysis expert. Analyze receipt images and extract all items with accurate carbon footprint calculations. Return a JSON object with: store_name, date, items array, and total_carbon_footprint. Each item must have: name, quantity, unit_price, carbon_footprint_kg (use these reference values: beef 27kg/kg, lamb 24kg/kg, pork 7.2kg/kg, chicken 6.9kg/kg, cheese 13.5kg/kg, milk 3.2kg/L, rice 4kg/kg, bread 1.6kg/kg, tomatoes 2.1kg/kg, bananas 0.7kg/kg, coffee 15kg/kg), category (beef/lamb/pork/chicken/dairy/produce/grains/beverages/other), and carbon_intensity (high >10kg, medium 2-10kg, low <2kg). Be precise with quantities and use standard units.'
         },
         {
           role: 'user',
@@ -46,7 +46,7 @@ serve(async (req) => {
       messages = [
         {
           role: 'system',
-          content: 'Analyze manual receipt data and calculate carbon footprints. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+          content: 'You are a carbon footprint analysis expert. Analyze manual receipt data and calculate accurate carbon footprints. Return a JSON object with: store_name, date, items array, and total_carbon_footprint. Each item must have: name, quantity, unit_price, carbon_footprint_kg (use these reference values: beef 27kg/kg, lamb 24kg/kg, pork 7.2kg/kg, chicken 6.9kg/kg, cheese 13.5kg/kg, milk 3.2kg/L, rice 4kg/kg, bread 1.6kg/kg, tomatoes 2.1kg/kg, bananas 0.7kg/kg, coffee 15kg/kg), category (beef/lamb/pork/chicken/dairy/produce/grains/beverages/other), and carbon_intensity (high >10kg, medium 2-10kg, low <2kg). Calculate based on actual product types and weights.'
         },
         {
           role: 'user',

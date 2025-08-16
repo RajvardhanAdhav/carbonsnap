@@ -76,53 +76,148 @@ export function ReductionTipsEngine({ items, totalEmissions, onTipSelect }: Redu
 
   const getItemSpecificTips = (item: ReceiptItem): ReductionTip[] => {
     const tips: ReductionTip[] = [];
+    const categoryLower = item.category.toLowerCase();
 
-    switch (item.category.toLowerCase()) {
-      case 'beef':
-        tips.push({
-          id: `beef-alt-${item.name}`,
-          title: 'Try Plant-Based Alternatives',
-          description: `Replace ${item.name} with plant-based alternatives to reduce emissions by up to 90%`,
-          type: 'substitution',
-          impact: 'high',
-          savingsPotential: item.emissions * 0.9,
-          difficulty: 'easy',
-          targetItems: [item.name],
-          icon: Leaf,
-          actionText: 'Find Alternatives',
-          learnMoreUrl: 'https://www.worldwildlife.org/stories/what-are-the-biggest-drivers-of-tropical-deforestation'
-        });
-        break;
+    // High-impact meat alternatives
+    if (categoryLower.includes('beef')) {
+      tips.push({
+        id: `beef-alt-${item.name}`,
+        title: 'Switch to Plant-Based Meat',
+        description: `Replace ${item.name} with Beyond Meat, Impossible Burger, or lentils to reduce emissions by 85-90%`,
+        type: 'substitution',
+        impact: 'high',
+        savingsPotential: item.emissions * 0.87,
+        difficulty: 'easy',
+        targetItems: [item.name],
+        icon: Leaf,
+        actionText: 'Find Plant Alternatives',
+        learnMoreUrl: 'https://www.worldwildlife.org/stories/what-are-the-biggest-drivers-of-tropical-deforestation'
+      });
+    }
 
-      case 'dairy':
-        tips.push({
-          id: `dairy-alt-${item.name}`,
-          title: 'Switch to Plant Milk',
-          description: `Plant-based milk alternatives can reduce your dairy emissions by 70%`,
-          type: 'substitution',
-          impact: 'medium',
-          savingsPotential: item.emissions * 0.7,
-          difficulty: 'easy',
-          targetItems: [item.name],
-          icon: Leaf,
-          actionText: 'Try Plant Milk'
-        });
-        break;
+    if (categoryLower.includes('lamb')) {
+      tips.push({
+        id: `lamb-alt-${item.name}`,
+        title: 'Try Mushroom or Jackfruit',
+        description: `Replace ${item.name} with mushroom-based proteins or jackfruit for 80% emission reduction`,
+        type: 'substitution',
+        impact: 'high',
+        savingsPotential: item.emissions * 0.8,
+        difficulty: 'easy',
+        targetItems: [item.name],
+        icon: Leaf,
+        actionText: 'Explore Alternatives'
+      });
+    }
 
-      case 'imported':
-        tips.push({
-          id: `local-alt-${item.name}`,
-          title: 'Choose Local Alternatives',
-          description: `Locally sourced ${item.category} can reduce transport emissions by up to 50%`,
-          type: 'purchase',
-          impact: 'medium',
-          savingsPotential: item.emissions * 0.3,
-          difficulty: 'moderate',
-          targetItems: [item.name],
-          icon: Target,
-          actionText: 'Find Local Options'
-        });
-        break;
+    if (categoryLower.includes('pork') || categoryLower.includes('bacon') || categoryLower.includes('sausage')) {
+      tips.push({
+        id: `pork-alt-${item.name}`,
+        title: 'Plant-Based Pork Alternatives',
+        description: `Try plant-based sausages, tempeh, or mushroom bacon for 70% emission reduction`,
+        type: 'substitution',
+        impact: 'high',
+        savingsPotential: item.emissions * 0.7,
+        difficulty: 'easy',
+        targetItems: [item.name],
+        icon: Leaf,
+        actionText: 'Find Alternatives'
+      });
+    }
+
+    if (categoryLower.includes('chicken')) {
+      tips.push({
+        id: `chicken-alt-${item.name}`,
+        title: 'Plant-Based Chicken',
+        description: `Switch to tofu, seitan, or plant-based chicken for 60% emission reduction`,
+        type: 'substitution',
+        impact: 'medium',
+        savingsPotential: item.emissions * 0.6,
+        difficulty: 'easy',
+        targetItems: [item.name],
+        icon: Leaf,
+        actionText: 'Try Alternatives'
+      });
+    }
+
+    // Dairy alternatives
+    if (categoryLower.includes('dairy') || categoryLower.includes('milk')) {
+      tips.push({
+        id: `dairy-alt-${item.name}`,
+        title: 'Plant-Based Milk',
+        description: `Switch to oat, soy, or almond milk for 65% emission reduction`,
+        type: 'substitution',
+        impact: 'medium',
+        savingsPotential: item.emissions * 0.65,
+        difficulty: 'easy',
+        targetItems: [item.name],
+        icon: Leaf,
+        actionText: 'Try Plant Milk'
+      });
+    }
+
+    if (categoryLower.includes('cheese')) {
+      tips.push({
+        id: `cheese-alt-${item.name}`,
+        title: 'Plant-Based Cheese',
+        description: `Try cashew cheese, nutritional yeast, or oat-based cheese for lower emissions`,
+        type: 'substitution',
+        impact: 'medium',
+        savingsPotential: item.emissions * 0.6,
+        difficulty: 'moderate',
+        targetItems: [item.name],
+        icon: Leaf,
+        actionText: 'Find Cheese Alternatives'
+      });
+    }
+
+    // Transport and sourcing tips
+    if (item.emissions > 2 && !categoryLower.includes('local')) {
+      tips.push({
+        id: `local-alt-${item.name}`,
+        title: 'Choose Local Sources',
+        description: `Look for locally-sourced ${item.category.toLowerCase()} to reduce transport emissions by 30-50%`,
+        type: 'purchase',
+        impact: 'medium',
+        savingsPotential: item.emissions * 0.4,
+        difficulty: 'moderate',
+        targetItems: [item.name],
+        icon: Target,
+        actionText: 'Find Local Options'
+      });
+    }
+
+    // Seasonal produce tips
+    if (categoryLower.includes('produce') || categoryLower.includes('fruit') || categoryLower.includes('vegetable')) {
+      const currentMonth = new Date().getMonth() + 1;
+      tips.push({
+        id: `seasonal-${item.name}`,
+        title: 'Buy Seasonal Produce',
+        description: `Choose seasonal alternatives to ${item.name} for 30% lower emissions`,
+        type: 'seasonal',
+        impact: 'medium',
+        savingsPotential: item.emissions * 0.3,
+        difficulty: 'easy',
+        targetItems: [item.name],
+        icon: Leaf,
+        actionText: 'See Seasonal Options'
+      });
+    }
+
+    // Packaging reduction for high-packaging items
+    if (item.emissions > 1) {
+      tips.push({
+        id: `bulk-${item.name}`,
+        title: 'Buy in Bulk',
+        description: `Purchase ${item.name} in bulk or with minimal packaging to reduce emissions by 15-25%`,
+        type: 'purchase',
+        impact: 'low',
+        savingsPotential: item.emissions * 0.2,
+        difficulty: 'easy',
+        targetItems: [item.name],
+        icon: Zap,
+        actionText: 'Find Bulk Options'
+      });
     }
 
     return tips;
@@ -130,35 +225,118 @@ export function ReductionTipsEngine({ items, totalEmissions, onTipSelect }: Redu
 
   const getGeneralBehaviorTips = (items: ReceiptItem[]): ReductionTip[] => {
     const tips: ReductionTip[] = [];
-    const categories = Array.from(new Set(items.map(item => item.category)));
+    const categories = Array.from(new Set(items.map(item => item.category.toLowerCase())));
+    
+    // Identify high-emission categories
+    const meatItems = items.filter(item => 
+      item.category.toLowerCase().includes('beef') || 
+      item.category.toLowerCase().includes('lamb') || 
+      item.category.toLowerCase().includes('pork') || 
+      item.category.toLowerCase().includes('chicken')
+    );
+    
+    const dairyItems = items.filter(item => 
+      item.category.toLowerCase().includes('dairy') || 
+      item.category.toLowerCase().includes('cheese') || 
+      item.category.toLowerCase().includes('milk')
+    );
 
-    if (categories.includes('meat')) {
+    // Meatless Monday tip for meat consumers
+    if (meatItems.length > 0) {
+      const avgMeatEmissions = meatItems.reduce((sum, item) => sum + item.emissions, 0) / meatItems.length;
       tips.push({
         id: 'meatless-monday',
         title: 'Try Meatless Monday',
-        description: 'Going meat-free one day per week can save 1.6 kg CO₂e weekly',
+        description: 'Going meat-free one day per week can save 1.6 kg CO₂e weekly (6.4 kg monthly)',
         type: 'behavior',
         impact: 'medium',
-        savingsPotential: 6.4, // Monthly savings
+        savingsPotential: Math.min(avgMeatEmissions * 4, 6.4), // Weekly * 4 or cap at 6.4
         difficulty: 'easy',
         targetItems: [],
         icon: TrendingDown,
-        actionText: 'Start Today'
+        actionText: 'Start This Week',
+        learnMoreUrl: 'https://www.meatlessmonday.com/the-global-movement/'
       });
     }
 
-    if (items.length > 10) {
+    // Enhanced meal planning with specific benefits
+    if (items.length > 8) {
       tips.push({
         id: 'meal-planning',
-        title: 'Plan Your Meals',
-        description: 'Meal planning reduces food waste and unnecessary purchases by 25%',
+        title: 'Plan Your Meals Weekly',
+        description: 'Meal planning reduces food waste by 25% and prevents impulse purchases of high-emission foods',
         type: 'behavior',
         impact: 'medium',
         savingsPotential: totalEmissions * 0.25,
         difficulty: 'moderate',
         targetItems: [],
         icon: Target,
-        actionText: 'Get Started'
+        actionText: 'Start Planning',
+        learnMoreUrl: 'https://www.fao.org/food-loss-and-food-waste/flw-data'
+      });
+    }
+
+    // Batch cooking tip for frequent shoppers
+    if (items.length > 12) {
+      tips.push({
+        id: 'batch-cooking',
+        title: 'Batch Cook Plant-Based Meals',
+        description: 'Cooking large portions of plant-based meals reduces both shopping frequency and meat dependency',
+        type: 'behavior',
+        impact: 'medium',
+        savingsPotential: totalEmissions * 0.2,
+        difficulty: 'moderate',
+        targetItems: [],
+        icon: Zap,
+        actionText: 'Learn Techniques'
+      });
+    }
+
+    // Plant-forward eating pattern
+    if (meatItems.length > dairyItems.length * 2) {
+      tips.push({
+        id: 'plant-forward',
+        title: 'Adopt Plant-Forward Eating',
+        description: 'Make plants the star of your meals - fill 2/3 of your plate with vegetables, grains, and legumes',
+        type: 'behavior',
+        impact: 'high',
+        savingsPotential: totalEmissions * 0.4,
+        difficulty: 'moderate',
+        targetItems: [],
+        icon: Leaf,
+        actionText: 'Get Recipes'
+      });
+    }
+
+    // Dairy reduction tip
+    if (dairyItems.length > 3) {
+      tips.push({
+        id: 'dairy-reduction',
+        title: 'Gradual Dairy Reduction',
+        description: 'Replace one dairy item per week with plant alternatives - start with milk in coffee/cereal',
+        type: 'behavior',
+        impact: 'medium',
+        savingsPotential: dairyItems.reduce((sum, item) => sum + item.emissions, 0) * 0.5,
+        difficulty: 'easy',
+        targetItems: [],
+        icon: TrendingDown,
+        actionText: 'Start Small'
+      });
+    }
+
+    // Shopping behavior tips
+    if (items.length > 15) {
+      tips.push({
+        id: 'shopping-list',
+        title: 'Stick to Shopping Lists',
+        description: 'Shopping with a predetermined list reduces impulse purchases of high-emission processed foods by 30%',
+        type: 'behavior',
+        impact: 'low',
+        savingsPotential: totalEmissions * 0.15,
+        difficulty: 'easy',
+        targetItems: [],
+        icon: Target,
+        actionText: 'Make Lists'
       });
     }
 

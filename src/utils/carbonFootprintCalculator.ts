@@ -400,39 +400,55 @@ export class CarbonFootprintCalculator {
     const suggestions: string[] = [];
     const total = Object.values(breakdown).reduce((sum, val) => sum + val, 0);
     
-    // Production-focused suggestions
-    if (breakdown.production / total > 0.6) {
-      if (category.includes('beef') || category.includes('lamb')) {
-        suggestions.push('Consider plant-based alternatives to reduce emissions by up to 90%');
-      } else if (category.includes('dairy')) {
-        suggestions.push('Try plant-based milk alternatives like oat or almond milk');
+    // Enhanced category-specific suggestions with exact alternatives
+    if (category.includes('beef')) {
+      suggestions.push('Switch to Beyond Meat, Impossible Burger, or beans/lentils (85-90% emission reduction)');
+      suggestions.push('Try "Meatless Monday" - reduce beef consumption by 1 day/week');
+    } else if (category.includes('lamb')) {
+      suggestions.push('Replace with mushroom-based proteins or jackfruit (80% emission reduction)');
+    } else if (category.includes('pork')) {
+      suggestions.push('Try plant-based sausages or tempeh (70% emission reduction)');
+    } else if (category.includes('cheese')) {
+      suggestions.push('Switch to cashew cheese, nutritional yeast, or oat-based cheese');
+    } else if (category.includes('milk') || category.includes('dairy')) {
+      suggestions.push('Try oat milk, soy milk, or almond milk (65% emission reduction)');
+    } else if (category.includes('chicken')) {
+      suggestions.push('Try tofu, seitan, or plant-based chicken alternatives (60% reduction)');
+    }
+    
+    // Transport and sourcing suggestions
+    if (modifiers.imported || breakdown.transport / total > 0.25) {
+      suggestions.push('Choose locally-sourced alternatives from farmers markets or local stores');
+      if (category.includes('produce')) {
+        suggestions.push('Buy seasonal produce - check local harvest calendars');
       }
     }
     
-    // Transport-focused suggestions
-    if (breakdown.transport / total > 0.3) {
-      if (modifiers.imported) {
-        suggestions.push('Choose local or regional alternatives when available');
+    // Packaging and shopping behavior suggestions
+    if (breakdown.packaging / total > 0.15) {
+      suggestions.push('Shop at bulk stores or bring reusable containers');
+      suggestions.push('Choose items with minimal or recyclable packaging');
+    }
+    
+    // Quantity and waste reduction
+    suggestions.push('Buy only what you need to reduce food waste');
+    
+    // Seasonal alternatives
+    if (!modifiers.seasonal && category.includes('produce')) {
+      const month = new Date().getMonth() + 1;
+      if (month >= 3 && month <= 8) {
+        suggestions.push('Choose spring/summer produce like tomatoes, berries, or leafy greens');
+      } else {
+        suggestions.push('Choose winter produce like root vegetables, squash, or citrus');
       }
-      suggestions.push('Buy seasonal produce to reduce transport emissions');
     }
     
-    // Packaging suggestions
-    if (breakdown.packaging / total > 0.2) {
-      suggestions.push('Look for bulk options or minimal packaging alternatives');
+    // Preparation method suggestions for high-emission foods
+    if (total > 5) { // High emission threshold
+      suggestions.push('When possible, choose fresh over processed versions');
     }
     
-    // Use phase suggestions
-    if (breakdown.use > 0) {
-      suggestions.push('Choose energy-efficient models and extend product lifespan');
-    }
-    
-    // General suggestions
-    if (!modifiers.organic && ['produce', 'dairy', 'meat'].some(cat => category.includes(cat))) {
-      suggestions.push('Consider organic options for potentially lower environmental impact');
-    }
-    
-    return suggestions.slice(0, 3); // Limit to 3 suggestions
+    return suggestions.slice(0, 4); // Increased to 4 suggestions for better guidance
   }
   
   static calculateConfidence(category: string, rawName: string, modifiers: ProductModifiers): number {
