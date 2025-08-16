@@ -84,10 +84,10 @@ const HomePage = () => {
       <section className="relative px-4 py-20 lg:py-32">
         <div className="container mx-auto max-w-4xl text-center">
           <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-eco-light/50 text-eco-primary text-sm font-medium">
+            <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
               <Leaf className="h-3 w-3" />
               Track your environmental impact
-            </div>
+            </p>
             
             <h1 className="text-4xl lg:text-6xl font-bold tracking-tight">
               Know Your Carbon
