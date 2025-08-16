@@ -34,3 +34,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.scan-barcode]
 verify_jwt = false
+[functions.test-openai-api]
+verify_jwt = false
