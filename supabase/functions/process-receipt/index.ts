@@ -260,7 +260,7 @@ async function processReceiptImage(imageData: string): Promise<ProcessedReceipt>
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5-2025-08-07',
         messages: [
           {
             role: 'system',
@@ -307,8 +307,7 @@ CRITICAL RULES:
             ]
           }
         ],
-        max_tokens: 4000,
-        temperature: 0.1
+        max_completion_tokens: 4000
       }),
     });
 
