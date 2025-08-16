@@ -141,9 +141,20 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
     <Card className="p-6 max-w-2xl mx-auto">
       <div className="space-y-4">
         {cameraError ? (
-          <div className="text-center space-y-4">
-            <div className="text-destructive text-sm">{cameraError}</div>
-            <div className="space-y-2">
+          <div className="text-center space-y-4 p-6 border border-destructive/20 rounded-lg bg-destructive/5">
+            <div className="text-destructive font-medium">{cameraError}</div>
+            <div className="text-muted-foreground text-sm">
+              Don't worry! You can still upload an image to scan your receipt.
+            </div>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => fileInputRef.current?.click()}
+                size="lg"
+                className="w-full bg-eco-primary hover:bg-eco-primary/90"
+              >
+                <Upload className="mr-2 h-5 w-5" />
+                Upload Image to Scan
+              </Button>
               <Button 
                 onClick={startCamera}
                 variant="outline"
@@ -152,18 +163,12 @@ export default function CameraScanner({ onCapture, onCancel, isProcessing }: Cam
                 <Camera className="mr-2 h-4 w-4" />
                 Try Camera Again
               </Button>
-              <Button 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Image Instead
-              </Button>
             </div>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,image/jpeg,image/jpg,image/png"
+              capture="environment"
               onChange={handleFileUpload}
               className="hidden"
             />
