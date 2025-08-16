@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import CameraScanner from "./CameraScanner";
 import ManualInputModal from "./ManualInputModal";
 import { BarcodeScanner } from "./enhanced/BarcodeScanner";
@@ -25,7 +24,7 @@ const ScannerPage = () => {
 
   const processImage = async (imageData: string, scanMethod: string = 'camera') => {
     console.log('ProcessImage called with scanMethod:', scanMethod, 'imageData length:', imageData.length);
-    if (!user || !session?.access_token) {
+    if (!user) {
       throw new Error('User not authenticated');
     }
 
@@ -33,23 +32,56 @@ const ScannerPage = () => {
     
     try {
       if (scanMode === 'receipt') {
-        console.log('Sending receipt to process-receipt function...');
-        const { data, error } = await supabase.functions.invoke('process-receipt', {
-          body: { imageData, scanMethod },
+        console.log('Sending receipt to OpenAI API...');
+        
+        // Convert data URL to base64 if needed
+        const base64Image = imageData.includes('base64,') 
+          ? imageData.split('base64,')[1] 
+          : imageData;
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
           },
+          body: JSON.stringify({
+            model: 'gpt-4.1-mini-2025-04-14',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Analyze this receipt image and extract all items with their carbon footprint. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:image/jpeg;base64,${base64Image}`
+                    }
+                  }
+                ]
+              }
+            ],
+            max_completion_tokens: 1000
+          }),
         });
 
-        console.log('Process-receipt response:', { data, error });
-        if (error) {
-          console.error('Supabase function error:', error);
-          throw new Error(error.message || 'Failed to process receipt');
+        if (!response.ok) {
+          throw new Error(`OpenAI API error: ${response.status}`);
         }
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to process receipt');
-        }
-        setScanResult({ type: 'receipt', ...data.data });
+
+        const data = await response.json();
+        const result = JSON.parse(data.choices[0].message.content);
+        
+        setScanResult({ 
+          type: 'receipt', 
+          store: result.store || 'Unknown Store',
+          date: result.date || new Date().toLocaleDateString(),
+          items: result.items || [],
+          totalCarbon: result.totalCarbon || 0
+        });
       }
     } catch (error) {
       console.error('Error processing image:', error);
@@ -61,27 +93,45 @@ const ScannerPage = () => {
   };
 
   const handleManualSubmit = async (data: any) => {
-    if (!user || !session?.access_token) {
+    if (!user) {
       throw new Error('User not authenticated');
     }
 
     setIsScanning(true);
     
     try {
-      // Only process manual receipt data now
-      const { data: result, error } = await supabase.functions.invoke('process-receipt', {
-        body: { 
-          imageData: 'manual-input',
-          scanMethod: 'manual',
-          manualData: data
-        },
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
         },
+        body: JSON.stringify({
+          model: 'gpt-4.1-mini-2025-04-14',
+          messages: [
+            {
+              role: 'user',
+              content: `Analyze this manual receipt data and calculate carbon footprints: ${JSON.stringify(data)}. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.`
+            }
+          ],
+          max_completion_tokens: 1000
+        }),
       });
 
-      if (error) throw error;
-      setScanResult({ type: 'receipt', ...result.data });
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const parsedResult = JSON.parse(result.choices[0].message.content);
+      
+      setScanResult({ 
+        type: 'receipt', 
+        store: parsedResult.store || 'Manual Input',
+        date: parsedResult.date || new Date().toLocaleDateString(),
+        items: parsedResult.items || [],
+        totalCarbon: parsedResult.totalCarbon || 0
+      });
     } catch (error) {
       console.error('Error processing manual input:', error);
       alert('Failed to process input. Please try again.');
@@ -92,7 +142,7 @@ const ScannerPage = () => {
   };
 
   const handleBarcodeDetected = async (barcode: string, productData?: any) => {
-    if (!user || !session?.access_token) {
+    if (!user) {
       throw new Error('User not authenticated');
     }
 
@@ -100,18 +150,44 @@ const ScannerPage = () => {
     setShowBarcodeScanner(false);
     
     try {
-      const { data, error } = await supabase.functions.invoke('scan-barcode', {
-        body: { 
-          barcode,
-          scanMethod: 'barcode'
-        },
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
         },
+        body: JSON.stringify({
+          model: 'gpt-4.1-mini-2025-04-14',
+          messages: [
+            {
+              role: 'user',
+              content: `Analyze this barcode: ${barcode} and provide product information with carbon footprint. Return a JSON object with: name, brand, carbon footprint in kg CO2e, category (low/medium/high), and details object containing material, origin, transport, and packaging information. Use typical values for common products.`
+            }
+          ],
+          max_completion_tokens: 800
+        }),
       });
 
-      if (error) throw error;
-      setScanResult({ type: 'item', ...data.data });
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const parsedResult = JSON.parse(result.choices[0].message.content);
+      
+      setScanResult({ 
+        type: 'item', 
+        name: parsedResult.name || 'Unknown Product',
+        brand: parsedResult.brand || 'Unknown Brand',
+        carbon: parsedResult.carbon || 0,
+        category: parsedResult.category || 'medium',
+        details: parsedResult.details || {
+          material: 'Unknown',
+          origin: 'Unknown',
+          transport: 'Unknown',
+          packaging: 'Unknown'
+        }
+      });
     } catch (error) {
       console.error('Error processing barcode:', error);
       alert('Failed to process barcode. Please try again.');
