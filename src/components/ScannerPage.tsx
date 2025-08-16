@@ -21,53 +21,65 @@ const ScannerPage = () => {
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showReductionTips, setShowReductionTips] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const processImage = async (imageData: string, scanMethod: string = 'camera') => {
     console.log('ProcessImage called with scanMethod:', scanMethod, 'imageData length:', imageData.length);
     if (!user) {
-      throw new Error('User not authenticated');
+      setError('User not authenticated');
+      return;
     }
 
     setIsScanning(true);
+    setError(null);
     
     try {
       if (scanMode === 'receipt') {
-        console.log('Sending receipt to OpenAI API...');
+        console.log('Sending receipt to Groq API...');
         
-        // Convert data URL to base64 if needed
-        const base64Image = imageData.includes('base64,') 
-          ? imageData.split('base64,')[1] 
-          : imageData;
-
-        const response = await fetch('https://api.openai.com/v1/responses', {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
+            'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'gpt-4.1-mini-2025-04-14',
-            input: [
+            messages: [
+              {
+                role: 'system',
+                content: 'Analyze receipt images and extract all items with their carbon footprint. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+              },
               {
                 role: 'user',
                 content: [
                   {
-                    type: 'input_text',
-                    text: 'Analyze this receipt image and extract all items with their carbon footprint. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+                    type: 'text',
+                    text: 'Please analyze this receipt and provide the carbon footprint data in JSON format'
                   },
                   {
-                    type: 'input_image',
-                    image_url: `data:image/jpeg;base64,${base64Image}`
+                    type: 'image_url',
+                    image_url: {
+                      url: imageData
+                    }
                   }
                 ]
               }
             ],
-            max_completion_tokens: 1000
+            model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+            temperature: 1,
+            max_completion_tokens: 1024,
+            top_p: 1,
+            stream: false,
+            response_format: {
+              type: 'json_object'
+            },
+            stop: null
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`OpenAI API error: ${response.status}`);
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || `Groq API error: ${response.status}`);
         }
 
         const data = await response.json();
@@ -83,7 +95,7 @@ const ScannerPage = () => {
       }
     } catch (error) {
       console.error('Error processing image:', error);
-      alert(`Receipt Processing Failed - ${error.message || 'Please try a clearer image or manual input'}`);
+      setError(`Receipt Processing Failed - ${error.message || 'Please try a clearer image or manual input'}`);
     } finally {
       setIsScanning(false);
       setShowCamera(false);
@@ -92,37 +104,51 @@ const ScannerPage = () => {
 
   const handleManualSubmit = async (data: any) => {
     if (!user) {
-      throw new Error('User not authenticated');
+      setError('User not authenticated');
+      return;
     }
 
     setIsScanning(true);
+    setError(null);
     
     try {
-      const response = await fetch('https://api.openai.com/v1/responses', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-mini-2025-04-14',
-          input: [
+          messages: [
+            {
+              role: 'system',
+              content: 'Analyze manual receipt data and calculate carbon footprints. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
+            },
             {
               role: 'user',
               content: [
                 {
-                  type: 'input_text',
-                  text: `Analyze this manual receipt data and calculate carbon footprints: ${JSON.stringify(data)}. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.`
+                  type: 'text',
+                  text: `Please analyze this manual receipt data: ${JSON.stringify(data)}`
                 }
               ]
             }
           ],
-          max_completion_tokens: 1000
+          model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+          temperature: 1,
+          max_completion_tokens: 1024,
+          top_p: 1,
+          stream: false,
+          response_format: {
+            type: 'json_object'
+          },
+          stop: null
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `Groq API error: ${response.status}`);
       }
 
       const result = await response.json();
@@ -137,7 +163,7 @@ const ScannerPage = () => {
       });
     } catch (error) {
       console.error('Error processing manual input:', error);
-      alert('Failed to process input. Please try again.');
+      setError(`Manual Input Processing Failed - ${error.message || 'Please try again.'}`);
     } finally {
       setIsScanning(false);
       setShowManualInput(false);
@@ -146,38 +172,52 @@ const ScannerPage = () => {
 
   const handleBarcodeDetected = async (barcode: string, productData?: any) => {
     if (!user) {
-      throw new Error('User not authenticated');
+      setError('User not authenticated');
+      return;
     }
 
     setIsScanning(true);
     setShowBarcodeScanner(false);
+    setError(null);
     
     try {
-      const response = await fetch('https://api.openai.com/v1/responses', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-mini-2025-04-14',
-          input: [
+          messages: [
+            {
+              role: 'system',
+              content: 'Analyze barcode data and provide product information with carbon footprint. Return a JSON object with: name, brand, carbon footprint in kg CO2e, category (low/medium/high), and details object containing material, origin, transport, and packaging information. Use typical values for common products.'
+            },
             {
               role: 'user',
               content: [
                 {
-                  type: 'input_text',
-                  text: `Analyze this barcode: ${barcode} and provide product information with carbon footprint. Return a JSON object with: name, brand, carbon footprint in kg CO2e, category (low/medium/high), and details object containing material, origin, transport, and packaging information. Use typical values for common products.`
+                  type: 'text',
+                  text: `Please analyze this barcode: ${barcode} and provide product information`
                 }
               ]
             }
           ],
-          max_completion_tokens: 800
+          model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+          temperature: 1,
+          max_completion_tokens: 1024,
+          top_p: 1,
+          stream: false,
+          response_format: {
+            type: 'json_object'
+          },
+          stop: null
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `Groq API error: ${response.status}`);
       }
 
       const result = await response.json();
@@ -198,7 +238,7 @@ const ScannerPage = () => {
       });
     } catch (error) {
       console.error('Error processing barcode:', error);
-      alert('Failed to process barcode. Please try again.');
+      setError(`Barcode Processing Failed - ${error.message || 'Please try again.'}`);
     } finally {
       setIsScanning(false);
     }
@@ -276,6 +316,13 @@ const ScannerPage = () => {
                 </Card>
               </div>
             </div>
+
+            {/* Error Display */}
+            {error && (
+              <Card className="p-4 mb-6 bg-destructive/10 border-destructive">
+                <p className="text-destructive text-center font-medium">{error}</p>
+              </Card>
+            )}
 
             {/* Scanner Options */}
             <Card className="p-8 text-center border-dashed border-2 border-eco-primary/30 bg-eco-light/30">
