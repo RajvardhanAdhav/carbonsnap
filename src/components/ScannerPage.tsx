@@ -39,7 +39,7 @@ const ScannerPage = () => {
           ? imageData.split('base64,')[1] 
           : imageData;
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch('https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -47,19 +47,17 @@ const ScannerPage = () => {
           },
           body: JSON.stringify({
             model: 'gpt-4.1-mini-2025-04-14',
-            messages: [
+            input: [
               {
                 role: 'user',
                 content: [
                   {
-                    type: 'text',
+                    type: 'input_text',
                     text: 'Analyze this receipt image and extract all items with their carbon footprint. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.'
                   },
                   {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:image/jpeg;base64,${base64Image}`
-                    }
+                    type: 'input_image',
+                    image_url: `data:image/jpeg;base64,${base64Image}`
                   }
                 ]
               }
@@ -100,7 +98,7 @@ const ScannerPage = () => {
     setIsScanning(true);
     
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,10 +106,15 @@ const ScannerPage = () => {
         },
         body: JSON.stringify({
           model: 'gpt-4.1-mini-2025-04-14',
-          messages: [
+          input: [
             {
               role: 'user',
-              content: `Analyze this manual receipt data and calculate carbon footprints: ${JSON.stringify(data)}. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.`
+              content: [
+                {
+                  type: 'input_text',
+                  text: `Analyze this manual receipt data and calculate carbon footprints: ${JSON.stringify(data)}. Return a JSON object with: store name, date, items array (each item should have name, quantity, carbon footprint in kg CO2e, and category: low/medium/high), and total carbon footprint. Estimate carbon footprints based on product type and typical values.`
+                }
+              ]
             }
           ],
           max_completion_tokens: 1000
@@ -150,7 +153,7 @@ const ScannerPage = () => {
     setShowBarcodeScanner(false);
     
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,10 +161,15 @@ const ScannerPage = () => {
         },
         body: JSON.stringify({
           model: 'gpt-4.1-mini-2025-04-14',
-          messages: [
+          input: [
             {
               role: 'user',
-              content: `Analyze this barcode: ${barcode} and provide product information with carbon footprint. Return a JSON object with: name, brand, carbon footprint in kg CO2e, category (low/medium/high), and details object containing material, origin, transport, and packaging information. Use typical values for common products.`
+              content: [
+                {
+                  type: 'input_text',
+                  text: `Analyze this barcode: ${barcode} and provide product information with carbon footprint. Return a JSON object with: name, brand, carbon footprint in kg CO2e, category (low/medium/high), and details object containing material, origin, transport, and packaging information. Use typical values for common products.`
+                }
+              ]
             }
           ],
           max_completion_tokens: 800
